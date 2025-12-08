@@ -36,6 +36,9 @@ my_theme <-
 set_gtsummary_theme(my_theme)
 theme_gtsummary_compact()
 
+# CH 환경
+setwd("C:/Users/chaehyun/Dropbox/Work/PIPET/과제/혈액내과/Teclistamab/Data")
+
 data_tecli <-read_excel('C:/Users/chaehyun/Dropbox/Work/PIPET/과제/혈액내과/Teclistamab/Data/tecli_chemo_2025-07-04.xlsx', sheet = 2, skip = 1) %>%  dplyr::select(Group, ISS_DX, SEX, CTX_S_DATE, BIRTH, CTX_LINE, HB_CTX, PLT_CTX, GFR_CTX, LDH_HIGH1_CTX, VS_PFS_CTX, DATE_PFS_CTX, PRE_CTX_R, VS, DATE_LAST, RESP_CTX, PID, DATE_DX, LDH_CTX, CREAT_CTX, ANC_CTX, ALC_CTX, Heavychain, Lightchain, FGFR3_IGH_DX_VALUE, MAF_IGH_DX_VALUE, CCND1_IGH_DX_VALUE, RB1_DX_VALUE, TP53_DX_VALUE, `1Q_DX`)%>% 
   mutate(CTX_S_DATE = as.Date(CTX_S_DATE),
          BIRTH = as.Date(BIRTH),
@@ -204,49 +207,6 @@ data_tidy <- data_new %>%
   filter(TIME >= 0 & TIME2 >= 0) 
 
 data_tidy$Group <- factor(data_tidy$Group, levels = c(2,1), labels = c("SOC", "Teclistamab"))
-
-####! Matching ---------------------------------------------------------------
-# PSM + PSM------
-psm = matchit(Group~ CTX_LINE_match3 + AGE + PLT_CTX,
-              data=data_tidy, method = "nearest", distance = "logit", replace = FALSE, caliper = 0.2, ratio =1)
-matched_data = match.data(psm)
-dat <- matched_data %>% select(c(Group,PID,CTX_LINE,CTX_LINE_match3))
-dat %>% 
-  print(n=100)
-
-# line 갖고 한 번 더 fit
-psm2 = matchit(Group~ CTX_LINE_match3,
-               data=dat, method = "nearest", distance = "logit", replace = FALSE, caliper = 0.2, ratio =1)
-matched_data2 = match.data(psm2)
-matched_data2 %>% print(n=100)
-
-matched_sub <- matched_data2 %>% select(c(Group,PID,CTX_LINE,CTX_LINE_match3,subclass))
-matched_sub %>% 
-  print(n=100)
-
-
-matched_sub <- matched_data2 %>%
-  select(subclass, Group, PID, CTX_LINE, CTX_LINE_match3) %>% 
-  mutate(subclass = as.character(subclass))
-
-Tecli <- matched_sub[matched_sub$Group=='Teclistamab',]
-SOC <- matched_sub[matched_sub$Group=='SOC',]
-
-
-joined <- Tecli %>%
-  left_join(
-    SOC,
-    by = "subclass",
-    suffix = c("_Tecli","_SOC")
-  )
-
-joined %>% print(n=100)
-
-# 4) csv 저장
-setwd("C:/Users/chaehyun/Dropbox/Work/PIPET/과제/혈액내과/Teclistamab/Data")
-write.csv(joined, "251202_PID_list_ps_CTX3.csv", row.names = FALSE) #CTX3 or CTX4
-
-
 
 
 #! Baseline ---------------------------------------------------------------
