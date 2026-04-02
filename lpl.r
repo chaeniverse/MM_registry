@@ -39,7 +39,7 @@ library(pROC)
 select <- dplyr::select
 
 # -- paths -- #
-DATA_PATH <- '/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Lpl/Data/WM final.xlsx'
+DATA_PATH <- '/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Lpl/Data/WM final_260401.xlsx'
 OUTPUT_DIR <- '/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Lpl/Results'
 
 # -- gtsummary theme -- #
@@ -140,58 +140,58 @@ priority_cols <- c(
 )
 
 
-whole %>%
-  select(-c("TLT12", "TNT12")) %>% 
-  select(all_of(priority_cols), everything()) %>% 
-  # select(all_of(priority_cols)) %>% # 필요한 것만 선택
-  tbl_summary(
-    label = list(
-      age ~ "Age (years)",
-      age65 ~ "Age > 65",
-      sex ~ "Sex",
-      PS ~ "ECOG performance status < 2",
-      LNE ~ "Lymphadenopathy",
-      HS ~ "Hepatosplenomegaly",
-      Hb ~ "Hemoglobin (g/dL)",
-      Hb10 ~ "Hemoglobin < 10 g/dL",
-      Hb11 ~ "Hemoglobin < 11 g/dL",
-      PLT ~ "Platelet (x10^9/uL)",
-      PLT100 ~ "Platelet < 100 x10^9/uL",
-      ALB ~ "Albumin (g/dL)",
-      ALB3.5 ~ "Albumin < 3.5 g/dL",
-      LDH ~ "LDH (IU/L)",
-      LDH2 ~ "LDH > upper limit of normal",
-      IgM_2 ~ "IgM (mg/dL)",
-      IgM4 ~ "IgM > 4000 mg/dL",
-      IgM7 ~ "IgM > 7000 mg/dL",
-      B2MG_cont ~ "Beta-2 microglobulin (mg/L)",
-      B2MG_cat ~ "Beta-2 microglobulin > 3 mg/L",
-      IPSS ~ "IPSS-WM",
-      RIPSS ~ "rIPSS-WM",
-      MSS ~ "MSS-WM",
-      MYD88 ~ "MYD88 mutation",
-      CXCR4 ~ "CXCR4 mutation",
-      B_Sx ~ "B symptoms",
-      sPEP ~ "Serum protein electrophoresis (g/dL)",
-      ANC ~ "ANC (/uL)"
-    ),
-    type = list(
-      all_continuous() ~ "continuous2"  # 새로 추가: mean+median 두 줄 표시
-    ),
-    statistic = list(                   
-      all_continuous() ~ c("{mean} ({sd})", "{median} ({p25}-{p75})"),
-      all_categorical() ~ "{n} ({p})%"
-    ),
-    digits = list(all_continuous() ~ 1, all_categorical() ~ c(0, 1)),
-    missing = "ifany",
-    missing_text = "Missing",
-    missing_stat = "{N_miss} ({p_miss}%)"
-  ) %>%
-  bold_labels() %>%
-  modify_header(label = "**Characteristic**") %>%
-  modify_caption("**Table 1. Baseline Characteristics (CRF, N = {N})**") %>%
-  as_flex_table() %>%
-  flextable::save_as_docx(path = file.path(OUTPUT_DIR, "[26-03-23] Baseline_CRF.docx"))
+# whole %>%
+#   select(-c("TLT12", "TNT12")) %>% 
+#   select(all_of(priority_cols), everything()) %>% 
+#   # select(all_of(priority_cols)) %>% # 필요한 것만 선택
+#   tbl_summary(
+#     label = list(
+#       age ~ "Age (years)",
+#       age65 ~ "Age > 65",
+#       sex ~ "Sex",
+#       PS ~ "ECOG performance status < 2",
+#       LNE ~ "Lymphadenopathy",
+#       HS ~ "Hepatosplenomegaly",
+#       Hb ~ "Hemoglobin (g/dL)",
+#       Hb10 ~ "Hemoglobin < 10 g/dL",
+#       Hb11 ~ "Hemoglobin < 11 g/dL",
+#       PLT ~ "Platelet (x10^9/uL)",
+#       PLT100 ~ "Platelet < 100 x10^9/uL",
+#       ALB ~ "Albumin (g/dL)",
+#       ALB3.5 ~ "Albumin < 3.5 g/dL",
+#       LDH ~ "LDH (IU/L)",
+#       LDH2 ~ "LDH > upper limit of normal",
+#       IgM_2 ~ "IgM (mg/dL)",
+#       IgM4 ~ "IgM > 4000 mg/dL",
+#       IgM7 ~ "IgM > 7000 mg/dL",
+#       B2MG_cont ~ "Beta-2 microglobulin (mg/L)",
+#       B2MG_cat ~ "Beta-2 microglobulin > 3 mg/L",
+#       IPSS ~ "IPSS-WM",
+#       RIPSS ~ "rIPSS-WM",
+#       MSS ~ "MSS-WM",
+#       MYD88 ~ "MYD88 mutation",
+#       CXCR4 ~ "CXCR4 mutation",
+#       B_Sx ~ "B symptoms",
+#       sPEP ~ "Serum protein electrophoresis (g/dL)",
+#       ANC ~ "ANC (/uL)"
+#     ),
+#     type = list(
+#       all_continuous() ~ "continuous2"  # 새로 추가: mean+median 두 줄 표시
+#     ),
+#     statistic = list(                   
+#       all_continuous() ~ c("{mean} ({sd})", "{median} ({p25}-{p75})"),
+#       all_categorical() ~ "{n} ({p})%"
+#     ),
+#     digits = list(all_continuous() ~ 1, all_categorical() ~ c(0, 1)),
+#     missing = "ifany",
+#     missing_text = "Missing",
+#     missing_stat = "{N_miss} ({p_miss}%)"
+#   ) %>%
+#   bold_labels() %>%
+#   modify_header(label = "**Characteristic**") %>%
+#   modify_caption("**Table 1. Baseline Characteristics (CRF, N = {N})**") %>%
+#   as_flex_table() %>%
+#   flextable::save_as_docx(path = file.path(OUTPUT_DIR, "[26-03-23] Baseline_CRF.docx"))
 
 
 
@@ -251,12 +251,12 @@ make_baseline_table <- function(data, group, exclude_cols, name) {
     as_flex_table() %>%
     flextable::save_as_docx(path = file.path(OUTPUT_DIR, paste0("[26-03-23] Baseline (", name, ").docx")))
 }
-# TLT12
-make_baseline_table(whole, group="TLT12", c("TLT","TNT12",'1L_1'), "TLT12")
-# TNT12
-make_baseline_table(whole, group="TNT12", c("TLT12"), "TNT12") 
+# # TLT12
+# make_baseline_table(whole, group="TLT12", c("TLT","TNT12",'1L_1'), "TLT12")
+# # TNT12
+# make_baseline_table(whole, group="TNT12", c("TLT12"), "TNT12") 
 
-View(dat)
+
 # -- 전처리 -- #
 dat <- crf %>%
   select(c("TLT12","진단일","last_fu", "death",
@@ -291,14 +291,17 @@ dat <- crf %>%
   as.numeric(last_fu - 진단일)
   ) %>%
   mutate(death_yr=death_day/365.25)
-table(dat$TLT12)
 
 
 # landmark
 dat_land <- dat[dat$death_yr >= 1,]
 fit <- survfit(Surv(death_yr, death) ~ TLT12, data=dat_land)
 
+# median
+sprintf("%.1f (%.1f, %.1f)", surv_median(fit)[1,2], surv_median(fit)[1,3], surv_median(fit)[1,4])
+sprintf("%.1f (%.1f, %.1f)", surv_median(fit)[2,2], surv_median(fit)[2,3], surv_median(fit)[2,4])
 
+library(gt)
 # -- Uni and multi results -- #
 # Uni #
 covariates <- setdiff(names(dat_land), c("death_yr", "death","last_fu", "진단일","death_day"))
@@ -396,10 +399,6 @@ sfit <- survfit(Surv(death_yr, death) ~ TLT12, data=reverse_dat)
 sprintf("%.1f (%.1f, %.1f)", surv_median(sfit)[1,2], surv_median(sfit)[1,3], surv_median(sfit)[1,4])
 sprintf("%.1f (%.1f, %.1f)", surv_median(sfit)[2,2], surv_median(sfit)[2,3], surv_median(sfit)[2,4])
 
-# median
-sprintf("%.1f (%.1f, %.1f)", surv_median(fit)[1,2], surv_median(fit)[1,3], surv_median(fit)[1,4])
-sprintf("%.1f (%.1f, %.1f)", surv_median(fit)[2,2], surv_median(fit)[2,3], surv_median(fit)[2,4])
-
 
 # cox model
 # 매칭 안 했으니까 아직은 안 써도 되지 않나.
@@ -476,8 +475,6 @@ dev.off()
 
 
 # -- iptw -- #
-dat_land <- dat[dat$death_yr >= 1,]
-
 my_weights = get_sw(TLT12 ~ age65 + ALB3.5 + LDH2 + RIPSS + MSS + liver + B_Sx + sPEP + ANC, data = dat_land)
 
 cox_fit <- coxph(Surv(death_yr, death) ~ TLT12, data=dat_land, weights= my_weights$weight, robust=TRUE)
@@ -487,6 +484,10 @@ sum_cox_fit
 
 # survival curve
 fit <- survfit(Surv(time=death_yr, event=death)~TLT12, data=dat_land, weights = my_weights$weight)
+
+# median
+sprintf("%.1f (%.1f, %.1f)", surv_median(fit)[1,2], surv_median(fit)[1,3], surv_median(fit)[1,4])
+sprintf("%.1f (%.1f, %.1f)", surv_median(fit)[2,2], surv_median(fit)[2,3], surv_median(fit)[2,4])
 
 
 # reverse kaplan-meier curve
@@ -498,10 +499,6 @@ surv_median(sfit)
 
 sprintf("%.1f (%.1f, %.1f)", surv_median(sfit)[1,2], surv_median(sfit)[1,3], surv_median(sfit)[1,4])
 sprintf("%.1f (%.1f, %.1f)", surv_median(sfit)[2,2], surv_median(sfit)[2,3], surv_median(sfit)[2,4])
-
-# median
-sprintf("%.1f (%.1f, %.1f)", surv_median(fit)[1,2], surv_median(fit)[1,3], surv_median(fit)[1,4])
-sprintf("%.1f (%.1f, %.1f)", surv_median(fit)[2,2], surv_median(fit)[2,3], surv_median(fit)[2,4])
 
 
 format_surv <- function(fit, time_point) {
@@ -563,68 +560,6 @@ p$plot <- p$plot +
   )
 
 p
-dev.off()
-
-
-
-
-###### balance check ------
-
-exp_form = group ~ ageg4 + SEX_TP_CD + CCI_score + Doublet + Low_intensity_triplet + High_intensity_triplet
-exp_var = all.vars(exp_form)[1]
-
-summary(my_weights$weight)
-tab_smd_adj = svyCreateTableOne(vars = all.vars(exp_form)[-1], strata = exp_var,
-                                data=svydesign(ids = ~1, data=scoring_MM_6mths_filtered, weights=my_weights$weight))
-
-tab_smd_un = svyCreateTableOne(vars = all.vars(exp_form)[-1], strata = exp_var,
-                               data=svydesign(ids = ~1, data=scoring_MM_6mths_filtered))
-tab_smd_adj1 = ExtractSmd(tab_smd_adj) %>% as.data.frame
-tab_smd_un1 = ExtractSmd(tab_smd_un) %>% as.data.frame
-
-tab_smd_adj1$variable = rownames(tab_smd_adj1); rownames(tab_smd_adj1) = NULL
-tab_smd_un1$variable = rownames(tab_smd_un1); rownames(tab_smd_un1) = NULL
-tab_smd_adj1$type = "Adjusted"
-tab_smd_un1$type = "Unadjusted"
-
-
-library(ggsci)
-
-
-
-col_val = NULL
-col_lab = NULL
-var_lab = c("High-intensity triplet", "Low-intensity triplet", "Doublet", "CCI score", "Sex", "Age group")
-
-if(is.null(col_val)){col_val = pal_lancet()(3)[c(1,3,2)]}
-if(is.null(col_lab)){col_lab = seq_len(3)-1}
-
-colnames(tab_smd_adj1)[2:4] <- colnames(tab_smd_un1)[2:4] <-
-  names(col_val) <- names(col_lab) <- c("SMD12", "SMD13", "SMD23")
-
-tab_smd_res = rbind.data.frame(tab_smd_adj1[,-1], tab_smd_un1[,-1])
-tab_smd_res$variable = factor(tab_smd_res$variable, levels = rev(unique(tab_smd_res$variable)),
-                              labels = var_lab)
-
-dev.new()
-pdf("250630_smdplot.pdf",height=7,width=12)
-tab_smd_res %>%
-  gather(key = "key", value = "value", -variable, -type) %>%
-  ggplot() +
-  geom_point(aes(x = value, y = variable, shape = type, col = key),size=3) +
-  
-  scale_shape_manual(values = c("Adjusted" = 19, "Unadjusted" = 4), name = "") +
-  scale_color_manual(values = col_val, labels = c("MGUS to MM",'SMM to MM', "De novo MM"), name = "") +
-  geom_vline(aes(xintercept = 0.1), linetype = "dashed") +
-  
-  labs(x = "Standardized mean difference", y = "Covariates") +
-  ggtitle("") +
-  
-  theme_classic() +
-  
-  theme(axis.text.y = element_text(size=11),
-        axis.title.x = element_text(size=14),
-        axis.title.y = element_text(size=14))
 dev.off()
 
 
