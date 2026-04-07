@@ -198,67 +198,67 @@ crf <- crf %>%
 #   flextable::save_as_docx(path = file.path(OUTPUT_DIR, "[26-04-03] Baseline_CRF.docx"))
 
 
-crf %>%
-  select(c("TLT12", "age", "age65", "sex", "ECOG performance status < 2", "B_Sx",     
-  "LNE", "HS", "spleen", "liver", "IgM_2", "IgM4", "sPEP", "ANC > 1000", "Hb", "Hb10", "PLT", "PLT100", "LDH",
-  "LDH2", "ALB", "ALB3.5", "B2MG_cont", "B2MG_cat", "IPSS", "RIPSS", "MSS", "MYD88", "CXCR4")) %>% 
-  tbl_summary(
-    by = TLT12,
-    label = list(
-      age ~ "Age (years)",
-      age65 ~ "Age > 65",
-      sex ~ "Sex",
-      `ECOG performance status < 2` ~ "ECOG performance status < 2",
-      LNE ~ "Lymphadenopathy",
-      HS ~ "Hepatosplenomegaly",
-      Hb ~ "Hemoglobin (g/dL)",
-      Hb10 ~ "Hemoglobin < 10 g/dL",
-      `ANC > 1000` ~ "ANC > 1000",
-      PLT ~ "Platelet (x10^9/uL)",
-      PLT100 ~ "Platelet < 100 x10^9/uL",
-      ALB ~ "Albumin (g/dL)",
-      ALB3.5 ~ "Albumin < 3.5 g/dL",
-      LDH ~ "LDH (IU/L)",
-      LDH2 ~ "LDH > upper limit of normal",
-      IgM_2 ~ "IgM (mg/dL)",
-      IgM4 ~ "IgM > 4000 mg/dL",
-      B2MG_cont ~ "Beta-2 microglobulin (mg/L)",
-      B2MG_cat ~ "Beta-2 microglobulin > 3 mg/L",
-      IPSS ~ "IPSS-WM",
-      RIPSS ~ "rIPSS-WM",
-      MSS ~ "MSS-WM",
-      MYD88 ~ "MYD88 mutation",
-      CXCR4 ~ "CXCR4 mutation",
-      sPEP ~ "Serum protein electrophoresis (g/dL)"
-    ),
-    type = list(
-      all_continuous() ~ "continuous"
-    ),
-    statistic = list(                   
-      all_continuous() ~ "{median} ({p25}-{p75})",
-      all_categorical() ~ "{n} ({p})"
-    ),
-    digits = list(all_continuous() ~ 1, all_categorical() ~ c(0, 1)),
-    missing = "ifany",
-    missing_text = "Missing",
-    missing_stat = "{N_miss} ({p_miss})"
-  ) %>%
-  add_p() %>%
-  add_overall() %>%
-  bold_labels() %>%
-  modify_header(label = "**Characteristic**") %>%
-  modify_caption("**Table 2. Baseline Characteristics by TLT12 (N = {N})**") %>%
-  as_flex_table() %>%
-  flextable::save_as_docx(path = file.path(OUTPUT_DIR, "[26-04-04] Baseline_by_TLT12.docx"))
+# crf %>%
+#   select(c("TLT12", "age", "age65", "sex", "ECOG performance status < 2", "B_Sx",     
+#   "LNE", "HS", "spleen", "liver", "IgM_2", "IgM4", "sPEP", "ANC > 1000", "Hb", "Hb10", "PLT", "PLT100", "LDH",
+#   "LDH2", "ALB", "ALB3.5", "B2MG_cont", "B2MG_cat", "IPSS", "RIPSS", "MSS", "MYD88", "CXCR4")) %>% 
+#   tbl_summary(
+#     by = TLT12,
+#     label = list(
+#       age ~ "Age (years)",
+#       age65 ~ "Age > 65",
+#       sex ~ "Sex",
+#       `ECOG performance status < 2` ~ "ECOG performance status < 2",
+#       LNE ~ "Lymphadenopathy",
+#       HS ~ "Hepatosplenomegaly",
+#       Hb ~ "Hemoglobin (g/dL)",
+#       Hb10 ~ "Hemoglobin < 10 g/dL",
+#       `ANC > 1000` ~ "ANC > 1000",
+#       PLT ~ "Platelet (x10^9/uL)",
+#       PLT100 ~ "Platelet < 100 x10^9/uL",
+#       ALB ~ "Albumin (g/dL)",
+#       ALB3.5 ~ "Albumin < 3.5 g/dL",
+#       LDH ~ "LDH (IU/L)",
+#       LDH2 ~ "LDH > upper limit of normal",
+#       IgM_2 ~ "IgM (mg/dL)",
+#       IgM4 ~ "IgM > 4000 mg/dL",
+#       B2MG_cont ~ "Beta-2 microglobulin (mg/L)",
+#       B2MG_cat ~ "Beta-2 microglobulin > 3 mg/L",
+#       IPSS ~ "IPSS-WM",
+#       RIPSS ~ "rIPSS-WM",
+#       MSS ~ "MSS-WM",
+#       MYD88 ~ "MYD88 mutation",
+#       CXCR4 ~ "CXCR4 mutation",
+#       sPEP ~ "Serum protein electrophoresis (g/dL)"
+#     ),
+#     type = list(
+#       all_continuous() ~ "continuous"
+#     ),
+#     statistic = list(                   
+#       all_continuous() ~ "{median} ({p25}-{p75})",
+#       all_categorical() ~ "{n} ({p})"
+#     ),
+#     digits = list(all_continuous() ~ 1, all_categorical() ~ c(0, 1)),
+#     missing = "ifany",
+#     missing_text = "Missing",
+#     missing_stat = "{N_miss} ({p_miss})"
+#   ) %>%
+#   add_p() %>%
+#   add_overall() %>%
+#   bold_labels() %>%
+#   modify_header(label = "**Characteristic**") %>%
+#   modify_caption("**Table 2. Baseline Characteristics by TLT12 (N = {N})**") %>%
+#   as_flex_table() %>%
+#   flextable::save_as_docx(path = file.path(OUTPUT_DIR, "[26-04-04] Baseline_by_TLT12.docx"))
 
 
 # --- 2-1. 분석용 데이터 준비 ---
-
+# sPEP 제외
 dat <- crf %>%
   select(
     c("TLT12","진단일","last_fu", "death","death_day","death_yr",
     "age65","sex","ECOG performance status < 2","B_Sx", "LNE",
-     "HS","spleen","liver","IgM4","sPEP", "ANC > 1000",
+     "HS","liver","IgM4","ANC > 1000",
      "Hb10","PLT100","LDH2","ALB3.5","B2MG_cat",
      "IPSS","RIPSS","MSS","MYD88","CXCR4")) %>%
   mutate(
@@ -273,7 +273,6 @@ dat <- crf %>%
     LDH2=factor(LDH2,levels=c(0,1)),
     IgM4=factor(IgM4,levels=c(0,1)),
     B2MG_cat=factor(B2MG_cat,levels=c(0,1)),
-    spleen=factor(spleen,levels=c(0,1)),
     liver=factor(liver,levels=c(0,1)),
     B_Sx=factor(B_Sx,levels=c(0,1)),
     `ANC > 1000` = factor(`ANC > 1000`, levels = c(0, 1))
@@ -384,38 +383,12 @@ vif_df %>%
   gt() %>%
   tab_header(title = "VIF - MSS Model")
 
-# HS 제거
-vars_no_hs <- setdiff(c(base_vars, "MSS"), "HS")
-model_no_hs <- glm(as.formula(paste("TLT12 ~", paste0("`", vars_no_hs, "`", collapse=" + "))), data=dat, family="binomial")
-vif_no_hs <- vif(model_no_hs)
-df_no_hs <- data.frame(Variable=rownames(vif_no_hs), VIF=round(vif_no_hs[,"GVIF^(1/(2*Df))"]^2,2), Model="HS 제거")
-
-# spleen 제거
-vars_no_sp <- setdiff(c(base_vars, "MSS"), "spleen")
-model_no_sp <- glm(as.formula(paste("TLT12 ~", paste0("`", vars_no_sp, "`", collapse=" + "))), data=dat, family="binomial")
-vif_no_sp <- vif(model_no_sp)
-df_no_sp <- data.frame(Variable=rownames(vif_no_sp), VIF=round(vif_no_sp[,"GVIF^(1/(2*Df))"]^2,2), Model="spleen 제거")
-
-bind_rows(df_no_hs, df_no_sp) %>%
-  arrange(Model, desc(VIF)) %>%
-  gt(groupname_col = "Model") %>%
-  tab_header(title = "VIF 비교")
-
-df_no_hs$AIC <- round(AIC(model_no_hs), 1)
-df_no_sp$AIC <- round(AIC(model_no_sp), 1)
-
-bind_rows(df_no_hs, df_no_sp) %>%
-  arrange(Model, desc(VIF)) %>%
-  gt(groupname_col = "Model") %>%
-  tab_header(title = "VIF 및 AIC 비교")
-
-
 # -- Score model -- #
 base_vars <- dat %>%
   select(-c("진단일","last_fu","death","death_day","death_yr","TLT12",
             "B2MG_cat","MYD88","CXCR4",
             "IPSS","RIPSS","MSS",
-            "spleen", "ANC > 1000")) %>%
+            "ANC > 1000")) %>%
   names()
 
 vars_mss <- c(base_vars, "MSS")
@@ -434,8 +407,6 @@ multi_df <- data.frame(
   multi_LCL = exp(coefs[["Estimate"]] - 1.96 * coefs[["Std. Error"]]),
   multi_UCL = exp(coefs[["Estimate"]] + 1.96 * coefs[["Std. Error"]]),
   multi_p   = coefs[["Pr(>|z|)"]],
-  multi_beta = coefs[["Estimate"]],
-  multi_Score = round(coefs[["Estimate"]] * 5),
   stringsAsFactors = F
 )
 
@@ -449,6 +420,8 @@ step_df <- data.frame(
   step_LCL = exp(coefs[["Estimate"]] - 1.96 * coefs[["Std. Error"]]),
   step_UCL = exp(coefs[["Estimate"]] + 1.96 * coefs[["Std. Error"]]),
   step_p   = coefs[["Pr(>|z|)"]],
+  step_beta = coefs[["Estimate"]],
+  step_Score = round(coefs[["Estimate"]] * 5),
   stringsAsFactors = F
 )
 
@@ -457,26 +430,26 @@ full_join(multi_df, step_df, by = "term") %>%
   mutate(
     multi_ci = sprintf("%.2f (%.2f-%.2f)", multi_OR, multi_LCL, multi_UCL),
     multi_pv = ifelse(multi_p < 0.001, "<.001", sprintf("%.3f", multi_p)),
-    Beta = sprintf("%.2f", multi_beta),
-    Score = as.character(multi_Score),
     step_ci = ifelse(is.na(step_OR), "-",
       sprintf("%.2f (%.2f-%.2f)", step_OR, step_LCL, step_UCL)),
     step_pv = ifelse(is.na(step_p), "-",
-      ifelse(step_p < 0.001, "<.001", sprintf("%.3f", step_p)))
+      ifelse(step_p < 0.001, "<.001", sprintf("%.3f", step_p))),
+    Beta = sprintf("%.2f", step_beta),
+    Score = as.character(step_Score)
   ) %>%
-  select(Variable = term, multi_ci, multi_pv, Beta, Score, step_ci, step_pv) %>%
+  select(Variable = term, multi_ci, multi_pv, step_ci, step_pv, Beta, Score) %>%
   gt() %>%
   cols_label(
     multi_ci = "OR (95% CI)", multi_pv = "P-value",
-    Beta = "Beta", Score = "Score",
-    step_ci = "OR (95% CI)", step_pv = "P-value"
+    step_ci = "OR (95% CI)", step_pv = "P-value",
+    Beta = "Beta", Score = "Score"
   ) %>%
   tab_header(
     title = "Score Model",
     subtitle = sprintf("Full AIC = %.1f / Step AIC = %.1f", AIC(full.model), AIC(step.model))
   ) %>%
-  tab_spanner(label = "Multivariable", columns = c(multi_ci, multi_pv, Beta, Score)) %>%
-  tab_spanner(label = "Stepwise", columns = c(step_ci, step_pv))
+  tab_spanner(label = "Multivariable", columns = c(multi_ci, multi_pv)) %>%
+  tab_spanner(label = "Stepwise", columns = c(step_ci, step_pv, Beta, Score))
 
 library(pROC)
 library(ggplot2)
@@ -486,23 +459,12 @@ library(plyr)
 # -- Score 계산 -- #
 kwci_score <- dat_complete %>%
   mutate(Score =
-           if_else(age65 == 1, 1, 0) +
-           if_else(sex == "F", -3, 0) +
-           if_else(`ECOG performance status < 2` == 1, 2, 0) +
-           if_else(B_Sx == 1, 2, 0) +
-           if_else(LNE == 1, 1, 0) +
-           if_else(HS == 1, -3, 0) +
-           if_else(liver == 1, 10, 0) +
-           if_else(IgM4 == 1, 2, 0) +
+           if_else(age65 == 1, -3, 0) +
+           if_else(sex == "F", -4, 0) +
+           if_else(liver == 1, 8, 0) +
            if_else(Hb10 == 1, 10, 0) +
-           if_else(LDH2 == 1, 9, 0) +
-           if_else(ALB3.5 == 1, 8, 0) +
-           case_when(
-             MSS == "2_low_Int" ~ -4,
-             MSS == "3_Int" ~ -9,
-             MSS == "4_High" ~ -9,
-             TRUE ~ 0
-           )
+           if_else(LDH2 == 1, 4, 0) +
+           if_else(ALB3.5 == 1, 4, 0) 
   )
 kwci_score$y <- full.model$y
 lancet_cols <- pal_lancet()(2)
@@ -535,7 +497,7 @@ kwci_score <- dat_complete %>%
              TRUE ~ 0
            )
   )
-kwci_score$y <- full.model$y
+kwci_score$y <- step.model$y
 lancet_cols <- pal_lancet()(2)
 
 
@@ -548,29 +510,29 @@ print(coords_best)
 kwci_score$outcome <- factor(kwci_score$y, levels = c(0, 1),
                               labels = c("TLT12-", "TLT12+"))
 
-# mu <- kwci_score %>%
-#   group_by(outcome) %>%
-#   summarise(grp.mean = mean(Score))
+mu <- kwci_score %>%
+  group_by(outcome) %>%
+  summarise(grp.mean = mean(Score))
 
-# p <- ggplot(kwci_score, aes(x = Score, fill = outcome, color = outcome)) +
-#   geom_histogram(aes(y = after_stat(density)), binwidth = 1, alpha = 0.2, position = "identity") +
-#   geom_vline(data = mu, aes(xintercept = grp.mean, color = outcome), linetype = "dashed") +
-#   geom_vline(xintercept = coords_best$threshold, linetype = "dotted", color = "black", linewidth = 1) +
-#   annotate("text", x = coords_best$threshold + 1, y = Inf, vjust = 2,
-#            label = sprintf("Cutoff = %.1f", coords_best$threshold), size = 4) +
-#   scale_fill_manual(values = lancet_cols, labels = c("TLT12-", "TLT12+")) +
-#   scale_color_manual(values = lancet_cols, labels = c("TLT12-", "TLT12+")) +
-#   theme(
-#     panel.background = element_rect(fill = "white"),
-#     panel.border = element_rect(fill = NA, colour = "black"),
-#     axis.text = element_text(size = 12, colour = "black"),
-#     axis.title = element_text(size = 14, colour = "black"),
-#     legend.position = "bottom",
-#     legend.title = element_text(face = "bold", size = 12),
-#     legend.text = element_text(size = 11)
-#   )
+p <- ggplot(kwci_score, aes(x = Score, fill = outcome, color = outcome)) +
+  geom_histogram(aes(y = after_stat(density)), binwidth = 1, alpha = 0.2, position = "identity") +
+  geom_vline(data = mu, aes(xintercept = grp.mean, color = outcome), linetype = "dashed") +
+  geom_vline(xintercept = coords_best$threshold, linetype = "dotted", color = "black", linewidth = 1) +
+  annotate("text", x = coords_best$threshold + 1, y = Inf, vjust = 2,
+           label = sprintf("Cutoff = %.1f", coords_best$threshold), size = 4) +
+  scale_fill_manual(values = lancet_cols, labels = c("TLT12-", "TLT12+")) +
+  scale_color_manual(values = lancet_cols, labels = c("TLT12-", "TLT12+")) +
+  theme(
+    panel.background = element_rect(fill = "white"),
+    panel.border = element_rect(fill = NA, colour = "black"),
+    axis.text = element_text(size = 12, colour = "black"),
+    axis.title = element_text(size = 14, colour = "black"),
+    legend.position = "bottom",
+    legend.title = element_text(face = "bold", size = 12),
+    legend.text = element_text(size = 11)
+  )
 
-# ggsave("KWCI_histogram.png", plot = p, height = 10, width = 10, dpi = 300)
+ggsave("KWCI_histogram.png", plot = p, height = 10, width = 10, dpi = 300)
 
 
 # -- Survival -- #
@@ -615,39 +577,40 @@ format_surv <- function(fit, time_point) {
   )
 }
 format_surv(fit_low, 5) %>% gt() %>% tab_header(title = "Low risk - 5yr survival")
+format_surv(fit_low, 10) %>% gt() %>% tab_header(title = "Low risk - 10yr survival")
 
 
-# plot
-# png("survival_low_risk.png", height = 10, width = 10, units = "in", res = 300)
-# font_size <- 18
-# p_low <- ggsurvplot(fit_low,
-#                     data = low_dat,
-#                     surv.median.line = "hv",
-#                     risk.table = TRUE,
-#                     tables.col = "strata",
-#                     tables.y.text = FALSE,
-#                     conf.int = TRUE,
-#                     xlim = c(0, 12),
-#                     xlab = "Time (years)",
-#                     ylab = "Survival Probability (%)",
-#                     legend = "none",
-#                     tables.height = 0.2,
-#                     break.time.by = 1,
-#                     risk.table.fontsize = 5,
-#                     palette = pal_lancet()(2),
-#                     # title = sprintf("Low risk (Score <= 5)\nHR: %s, %s", HR_low, p_low),
-#                     tables.theme = theme_cleantable() +
-#                       theme(plot.title = element_text(size = font_size))
-# )
-# p_low$plot <- p_low$plot +
-#   scale_y_continuous(labels = function(x) x * 100) +
-#   theme(
-#     axis.title = element_text(size = font_size),
-#     axis.text = element_text(size = font_size),
-#     legend.text = element_text(size = font_size - 2)
-#   )
-# print(p_low)
-# dev.off()
+plot
+png("survival_low_risk.png", height = 10, width = 10, units = "in", res = 300)
+font_size <- 18
+p_low <- ggsurvplot(fit_low,
+                    data = low_dat,
+                    surv.median.line = "hv",
+                    risk.table = TRUE,
+                    tables.col = "strata",
+                    tables.y.text = FALSE,
+                    conf.int = FALSE,
+                    xlim = c(0, 12),
+                    xlab = "Time (years)",
+                    ylab = "Survival Probability (%)",
+                    legend = "none",
+                    tables.height = 0.2,
+                    break.time.by = 1,
+                    risk.table.fontsize = 5,
+                    palette = pal_lancet()(2),
+                    # title = sprintf("Low risk (Score <= 5)\nHR: %s, %s", HR_low, p_low),
+                    tables.theme = theme_cleantable() +
+                      theme(plot.title = element_text(size = font_size))
+)
+p_low$plot <- p_low$plot +
+  scale_y_continuous(labels = function(x) x * 100) +
+  theme(
+    axis.title = element_text(size = font_size),
+    axis.text = element_text(size = font_size),
+    legend.text = element_text(size = font_size - 2)
+  )
+print(p_low)
+dev.off()
 
 # -- High risk group -- #
 high_dat <- kwci_land[kwci_land$risk == "High", ]
@@ -686,7 +649,7 @@ p_high <- ggsurvplot(fit_high,
                      risk.table = TRUE,
                      tables.col = "strata",
                      tables.y.text = FALSE,
-                     conf.int = TRUE,
+                     conf.int = FALSE,
                      xlim = c(0, 12),
                      xlab = "Time (years)",
                      ylab = "Survival Probability (%)",
@@ -717,8 +680,7 @@ dev.off()
 base_vars <- dat %>%
   select(-c("진단일","last_fu","death","death_day","death_yr","TLT12",
             "B2MG_cat","MYD88","CXCR4",
-            "IPSS","RIPSS","MSS",
-            "spleen", "ANC > 1000")) %>%
+            "IPSS","RIPSS","MSS", "ANC > 1000")) %>%
   names()
 
 fml <- as.formula(paste("TLT12 ~", paste0("`", base_vars, "`", collapse = " + ")))
@@ -736,8 +698,6 @@ multi_df <- data.frame(
   multi_LCL = exp(coefs[["Estimate"]] - 1.96 * coefs[["Std. Error"]]),
   multi_UCL = exp(coefs[["Estimate"]] + 1.96 * coefs[["Std. Error"]]),
   multi_p   = coefs[["Pr(>|z|)"]],
-  multi_beta = coefs[["Estimate"]],
-  multi_Score = round(coefs[["Estimate"]] * 5),
   stringsAsFactors = F
 )
 
@@ -751,6 +711,8 @@ step_df <- data.frame(
   step_LCL = exp(coefs[["Estimate"]] - 1.96 * coefs[["Std. Error"]]),
   step_UCL = exp(coefs[["Estimate"]] + 1.96 * coefs[["Std. Error"]]),
   step_p   = coefs[["Pr(>|z|)"]],
+  step_beta = coefs[["Estimate"]],
+  step_Score = round(coefs[["Estimate"]] * 5),
   stringsAsFactors = F
 )
 
@@ -759,26 +721,26 @@ full_join(multi_df, step_df, by = "term") %>%
   mutate(
     multi_ci = sprintf("%.2f (%.2f-%.2f)", multi_OR, multi_LCL, multi_UCL),
     multi_pv = ifelse(multi_p < 0.001, "<.001", sprintf("%.3f", multi_p)),
-    Beta = sprintf("%.2f", multi_beta),
-    Score = as.character(multi_Score),
     step_ci = ifelse(is.na(step_OR), "-",
       sprintf("%.2f (%.2f-%.2f)", step_OR, step_LCL, step_UCL)),
     step_pv = ifelse(is.na(step_p), "-",
-      ifelse(step_p < 0.001, "<.001", sprintf("%.3f", step_p)))
+      ifelse(step_p < 0.001, "<.001", sprintf("%.3f", step_p))),
+    Beta = sprintf("%.2f", step_beta),
+    Score = as.character(step_Score)
   ) %>%
-  select(Variable = term, multi_ci, multi_pv, Beta, Score, step_ci, step_pv) %>%
+  select(Variable = term, multi_ci, multi_pv, step_ci, step_pv, Beta, Score) %>%
   gt() %>%
   cols_label(
     multi_ci = "OR (95% CI)", multi_pv = "P-value",
-    Beta = "Beta", Score = "Score",
-    step_ci = "OR (95% CI)", step_pv = "P-value"
+    step_ci = "OR (95% CI)", step_pv = "P-value",
+    Beta = "Beta", Score = "Score"
   ) %>%
   tab_header(
     title = "Score Model",
     subtitle = sprintf("Full AIC = %.1f / Step AIC = %.1f", AIC(full.model), AIC(step.model))
   ) %>%
-  tab_spanner(label = "Multivariable", columns = c(multi_ci, multi_pv, Beta, Score)) %>%
-  tab_spanner(label = "Stepwise", columns = c(step_ci, step_pv))
+  tab_spanner(label = "Multivariable", columns = c(multi_ci, multi_pv)) %>%
+  tab_spanner(label = "Stepwise", columns = c(step_ci, step_pv, Beta, Score))
 
 # -- ROC 비교 -- #
 mod_mss <- glm(TLT12 ~ MSS, data = dat, family = "binomial")
@@ -798,17 +760,17 @@ sprintf("MSS AUC: %.3f (%.3f-%.3f)", auc(roc_mss), ci_mss[1], ci_mss[3])
 sprintf("IPSS AUC: %.3f (%.3f-%.3f)", auc(roc_ipss), ci_ipss[1], ci_ipss[3])
 sprintf("RIPSS AUC: %.3f (%.3f-%.3f)", auc(roc_ripss), ci_ripss[1], ci_ripss[3])
 
-# -- Full model ROC -- #
-roc_full <- roc(full.model$y, full.model$fitted.values)
-ci_full <- ci.auc(roc_full)
-sprintf("Full model AUC: %.3f (%.3f-%.3f)", auc(roc_full), ci_full[1], ci_full[3])
+# -- Stepwise model ROC -- #
+roc_step <- roc(step.model$y, step.model$fitted.values)
+ci_step <- ci.auc(roc_step)
+sprintf("Stepwise model AUC: %.3f (%.3f-%.3f)", auc(roc_step), ci_step[1], ci_step[3])
 
 # -- ROC curve 겹쳐 그리기 -- #
 lancet_cols <- pal_lancet()(4)
 
 # png("ROC_comparison.png", height = 10, width = 10, units = "in", res = 300)
 # par(pty = "s")
-# plot(roc_full, legacy.axes = T, col = lancet_cols[1], lwd = 3,
+# plot(roc_step, legacy.axes = T, col = lancet_cols[1], lwd = 3,
 #      xlab = "1 - Specificity", ylab = "Sensitivity",
 #      cex.lab = 1.3, cex.axis = 1.2)
 # plot(roc_mss, legacy.axes = T, col = lancet_cols[2], lwd = 3, add = TRUE)
@@ -817,7 +779,7 @@ lancet_cols <- pal_lancet()(4)
 
 # legend("bottomright",
 #        legend = c(
-#          sprintf("Full model: %.3f (%.3f-%.3f)", auc(roc_full), ci_full[1], ci_full[3]),
+#          sprintf("Stepwise model: %.3f (%.3f-%.3f)", auc(roc_step), ci_step[1], ci_step[3]),
 #          sprintf("MSS: %.3f (%.3f-%.3f)", auc(roc_mss), ci_mss[1], ci_mss[3]),
 #          sprintf("IPSS: %.3f (%.3f-%.3f)", auc(roc_ipss), ci_ipss[1], ci_ipss[3]),
 #          sprintf("RIPSS: %.3f (%.3f-%.3f)", auc(roc_ripss), ci_ripss[1], ci_ripss[3])
@@ -832,18 +794,13 @@ lancet_cols <- pal_lancet()(4)
 kwci_score <- dat_complete %>%
   mutate(Score =
            if_else(age65 == 1, -3, 0) +
-           if_else(sex == "F", -3, 0) +
-           if_else(`ECOG performance status < 2` == 1, 3, 0) +
-           if_else(B_Sx == 1, 2, 0) +
-           if_else(LNE == 1, 1, 0) +
-           if_else(HS == 1, -3, 0) +
-           if_else(liver == 1, 11, 0) +
-           if_else(IgM4 == 1, 2, 0) +
-           if_else(Hb10 == 1, 9, 0) +
-           if_else(LDH2 == 1, 5, 0) +
-           if_else(ALB3.5 == 1, 5, 0)
+           if_else(sex == "F", -4, 0) +
+           if_else(liver == 1, 8, 0) +
+           if_else(Hb10 == 1, 10, 0) +
+           if_else(LDH2 == 1, 4, 0) +
+           if_else(ALB3.5 == 1, 4, 0)
   )
-kwci_score$y <- full.model$y
+kwci_score$y <- step.model$y
 lancet_cols <- pal_lancet()(2)
 
 # -- Optimal cutoff (Youden index) -- #
@@ -855,29 +812,29 @@ print(coords_best)
 kwci_score$outcome <- factor(kwci_score$y, levels = c(0, 1),
                               labels = c("TLT12-", "TLT12+"))
 
-# mu <- kwci_score %>%
-#   group_by(outcome) %>%
-#   summarise(grp.mean = mean(Score))
+mu <- kwci_score %>%
+  group_by(outcome) %>%
+  summarise(grp.mean = mean(Score))
 
-# p <- ggplot(kwci_score, aes(x = Score, fill = outcome, color = outcome)) +
-#   geom_histogram(aes(y = after_stat(density)), binwidth = 1, alpha = 0.2, position = "identity") +
-#   geom_vline(data = mu, aes(xintercept = grp.mean, color = outcome), linetype = "dashed") +
-#   geom_vline(xintercept = coords_best$threshold, linetype = "dotted", color = "black", linewidth = 1) +
-#   annotate("text", x = coords_best$threshold + 1, y = Inf, vjust = 2,
-#            label = sprintf("Cutoff = %.1f", coords_best$threshold), size = 4) +
-#   scale_fill_manual(values = lancet_cols, labels = c("TLT12-", "TLT12+")) +
-#   scale_color_manual(values = lancet_cols, labels = c("TLT12-", "TLT12+")) +
-#   theme(
-#     panel.background = element_rect(fill = "white"),
-#     panel.border = element_rect(fill = NA, colour = "black"),
-#     axis.text = element_text(size = 12, colour = "black"),
-#     axis.title = element_text(size = 14, colour = "black"),
-#     legend.position = "bottom",
-#     legend.title = element_text(face = "bold", size = 12),
-#     legend.text = element_text(size = 11)
-#   )
+p <- ggplot(kwci_score, aes(x = Score, fill = outcome, color = outcome)) +
+  geom_histogram(aes(y = after_stat(density)), binwidth = 1, alpha = 0.2, position = "identity") +
+  geom_vline(data = mu, aes(xintercept = grp.mean, color = outcome), linetype = "dashed") +
+  geom_vline(xintercept = coords_best$threshold, linetype = "dotted", color = "black", linewidth = 1) +
+  annotate("text", x = coords_best$threshold + 1, y = Inf, vjust = 2,
+           label = sprintf("Cutoff = %.1f", coords_best$threshold), size = 4) +
+  scale_fill_manual(values = lancet_cols, labels = c("TLT12-", "TLT12+")) +
+  scale_color_manual(values = lancet_cols, labels = c("TLT12-", "TLT12+")) +
+  theme(
+    panel.background = element_rect(fill = "white"),
+    panel.border = element_rect(fill = NA, colour = "black"),
+    axis.text = element_text(size = 12, colour = "black"),
+    axis.title = element_text(size = 14, colour = "black"),
+    legend.position = "bottom",
+    legend.title = element_text(face = "bold", size = 12),
+    legend.text = element_text(size = 11)
+  )
 
-# ggsave("KWCI_histogram_noMSS.png", plot = p, height = 10, width = 10, dpi = 300)
+ggsave("KWCI_histogram_noMSS.png", plot = p, height = 10, width = 10, dpi = 300)
 
 # -- Survival -- #
 kwci_score$risk <- ifelse(kwci_score$Score <= coords_best$threshold, "Low", "High")
@@ -924,35 +881,35 @@ format_surv(fit_low, 5) %>% gt() %>% tab_header(title = "Low risk - 5yr survival
 format_surv(fit_low, 10) %>% gt() %>% tab_header(title = "Low risk - 10yr survival")
 
 # plot
-# png("survival_low_risk_noMSS.png", height = 10, width = 10, units = "in", res = 300)
-# font_size <- 18
-# p_low <- ggsurvplot(fit_low,
-#                     data = low_dat,
-#                     surv.median.line = "hv",
-#                     risk.table = TRUE,
-#                     tables.col = "strata",
-#                     tables.y.text = FALSE,
-#                     conf.int = TRUE,
-#                     xlim = c(0, 12),
-#                     xlab = "Time (years)",
-#                     ylab = "Survival Probability (%)",
-#                     legend = "none",
-#                     tables.height = 0.2,
-#                     break.time.by = 1,
-#                     risk.table.fontsize = 5,
-#                     palette = pal_lancet()(2),
-#                     tables.theme = theme_cleantable() +
-#                       theme(plot.title = element_text(size = font_size))
-# )
-# p_low$plot <- p_low$plot +
-#   scale_y_continuous(labels = function(x) x * 100) +
-#   theme(
-#     axis.title = element_text(size = font_size),
-#     axis.text = element_text(size = font_size),
-#     legend.text = element_text(size = font_size - 2)
-#   )
-# print(p_low)
-# dev.off()
+png("survival_low_risk_noMSS.png", height = 10, width = 10, units = "in", res = 300)
+font_size <- 18
+p_low <- ggsurvplot(fit_low,
+                    data = low_dat,
+                    surv.median.line = "hv",
+                    risk.table = TRUE,
+                    tables.col = "strata",
+                    tables.y.text = FALSE,
+                    conf.int = FALSE,
+                    xlim = c(0, 12),
+                    xlab = "Time (years)",
+                    ylab = "Survival Probability (%)",
+                    legend = "none",
+                    tables.height = 0.2,
+                    break.time.by = 1,
+                    risk.table.fontsize = 5,
+                    palette = pal_lancet()(2),
+                    tables.theme = theme_cleantable() +
+                      theme(plot.title = element_text(size = font_size))
+)
+p_low$plot <- p_low$plot +
+  scale_y_continuous(labels = function(x) x * 100) +
+  theme(
+    axis.title = element_text(size = font_size),
+    axis.text = element_text(size = font_size),
+    legend.text = element_text(size = font_size - 2)
+  )
+print(p_low)
+dev.off()
 
 # -- High risk group -- #
 high_dat <- kwci_land[kwci_land$risk == "High", ]
@@ -991,7 +948,7 @@ p_high <- ggsurvplot(fit_high,
                      risk.table = TRUE,
                      tables.col = "strata",
                      tables.y.text = FALSE,
-                     conf.int = TRUE,
+                     conf.int = FALSE,
                      xlim = c(0, 12),
                      xlab = "Time (years)",
                      ylab = "Survival Probability (%)",
