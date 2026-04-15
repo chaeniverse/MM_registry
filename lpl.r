@@ -32,6 +32,7 @@ library(numDeriv)
 library(MASS)
 library(htmltools)
 library(pROC)
+library(car)
 select <- dplyr::select
 
 # -- paths -- #
@@ -271,6 +272,31 @@ for (nm in c("None", "IPSS", "RIPSS", "MSS")) {
   
   # Full model
   full.model <- coxph(fml, data = dat_complete)
+
+  # ---- VIF 확인 ---- #
+  vif_vals <- car::vif(full.model)
+  
+  # 범주형(GVIF) 처리: vif()가 matrix를 반환하면 GVIF^(1/(2*Df)) 사용
+  if (is.matrix(vif_vals)) {
+    vif_df <- data.frame(
+      Variable = rownames(vif_vals),
+      VIF = (vif_vals[, "GVIF^(1/(2*Df))"])^2
+    )
+  } else {
+    vif_df <- data.frame(
+      Variable = names(vif_vals),
+      VIF = vif_vals
+    )
+  }
+  
+  vif_tbl <- vif_df %>%
+    gt() %>%
+    tab_header(
+      title = sprintf("VIF - %s", ifelse(nm == "None", "Base only", nm))
+    )
+  print(vif_tbl)
+
+
   s <- summary(full.model)
   coefs <- as.data.frame(s$coefficients)
   ci <- as.data.frame(s$conf.int)
