@@ -146,7 +146,7 @@ crf <- crf %>%
 dat <- crf %>%
   select(
     c("TLT12", "age65", "sex", `ECOG performance status < 2`, "B_Sx", 
-    "LNE", "HS", "IgM4", "ANC < 1000", "Hb10", "PLT100", "LDH2", 
+    "LNE", "HS", "IgM4", "ANC < 1000", "PLT100", "LDH2", 
     "ALB3.5", "B2MG_cat", "IPSS", "RIPSS", 
     "MSS", "MYD88", "CXCR4", "진단일","last_fu", 
     "death","death_day","death_yr")) %>%
@@ -156,7 +156,7 @@ dat <- crf %>%
     `ECOG performance status < 2`=factor(`ECOG performance status < 2`,levels=c(0,1)),
     LNE=factor(LNE,levels=c(0,1)),
     HS=factor(HS,levels=c(0,1)),
-    Hb10=factor(Hb10,levels=c(0,1)),
+    # Hb10=factor(Hb10,levels=c(0,1)),
     PLT100=factor(PLT100,levels=c(0,1)),
     ALB3.5=factor(ALB3.5,levels=c(0,1)),
     LDH2=factor(LDH2,levels=c(0,1)),
