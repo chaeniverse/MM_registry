@@ -80,12 +80,13 @@ crf <- read_excel(DATA_PATH, sheet = 'CRF') %>%
 # 연속형 NA -> 범주형 NA로 변환 (예: Hb, PLT, ALB, LDH, IgM_2, B2MG_cont, sPEP, WBC, ANC)
 crf <- crf %>%
   select(c("TLT12", "1L_1", "age", "age65", "sex", "ECOG", "PS", "B_Sx", "LNE", 
-  "HS", "IgM4", "ANC", "Hb", "Hb10", "Hb11", "PLT", "PLT100", "LDH", "LDH2", 
+  "HS", "spleen", "liver", "IgM4", "sPEP", "ANC", "Hb", "Hb10", "Hb11", "PLT", "PLT100", "LDH", "LDH2", 
   "ALB", "ALB3.5", "B2MG_cont", "B2MG_cat", "IPSS", "RIPSS", "MSS", "MYD88", "CXCR4",
   "진단일","last_fu", "death")) %>%
   mutate(
     age = as.numeric(age),
     ANC = as.numeric(ANC),
+    sPEP = as.numeric(sPEP),
     Hb = as.numeric(Hb),
     PLT = as.numeric(PLT),
     LDH = as.numeric(LDH),
@@ -192,3 +193,6 @@ crf %>%
   modify_header(label = "**Characteristic**") %>%
   modify_caption("**Table 2. Baseline Characteristics by TLT12 (N = {N})**") %>%
   as_flex_table() 
+  
+#   %>%
+#   flextable::save_as_docx(path = file.path(OUTPUT_DIR, "[26-04-04] Baseline_by_TLT12.docx"))
