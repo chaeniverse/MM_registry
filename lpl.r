@@ -33,6 +33,9 @@ library(MASS)
 library(htmltools)
 library(pROC)
 library(car)
+library(gt)
+library(ggsci)
+library(dplyr)
 select <- dplyr::select
 
 # -- paths -- #
@@ -80,7 +83,7 @@ crf <- read_excel(DATA_PATH, sheet = 'CRF') %>%
 # 연속형 NA -> 범주형 NA로 변환 (예: Hb, PLT, ALB, LDH, IgM_2, B2MG_cont, sPEP, WBC, ANC)
 crf <- crf %>%
   select(c("TLT12", "1L_1", "age", "age65", "sex", "ECOG", "PS", "B_Sx", "LNE", 
-  "HS", "IgM4", "ANC", "Hb", "Hb10", "Hb11", "PLT", "PLT100", "LDH", "LDH2", 
+  "HS", "IgM7", "ANC", "Hb", "Hb10", "Hb11", "PLT", "PLT100", "LDH", "LDH2", 
   "ALB", "ALB3.5", "B2MG_cont", "B2MG_cat", "IPSS", "RIPSS", "MSS", "MYD88", "CXCR4",
   "진단일","last_fu", "death")) %>%
   mutate(
@@ -146,7 +149,7 @@ crf <- crf %>%
 dat <- crf %>%
   select(
     c("TLT12", "age65", "sex", `ECOG performance status < 2`, "B_Sx", 
-    "LNE", "HS", "IgM4", "ANC < 1000", "PLT100", "LDH2", 
+    "LNE", "HS", "IgM7", "ANC < 1000", "PLT100", "LDH2", 
     "ALB3.5", "B2MG_cat", "IPSS", "RIPSS", 
     "MSS", "MYD88", "CXCR4", "진단일","last_fu", 
     "death","death_day","death_yr")) %>%
@@ -160,7 +163,7 @@ dat <- crf %>%
     PLT100=factor(PLT100,levels=c(0,1)),
     ALB3.5=factor(ALB3.5,levels=c(0,1)),
     LDH2=factor(LDH2,levels=c(0,1)),
-    IgM4=factor(IgM4,levels=c(0,1)),
+    IgM7=factor(IgM7,levels=c(0,1)),
     B2MG_cat=factor(B2MG_cat,levels=c(0,1)),
     B_Sx=factor(B_Sx,levels=c(0,1)),
     `ANC < 1000` = factor(`ANC < 1000`, levels = c(0, 1))
@@ -170,7 +173,6 @@ dat <- crf %>%
 
 
 # -- Uni results (Cox PH) -- #
-library(gt)
 
 covariates <- dat %>%
   select(-c("진단일","last_fu", "death", "death_day", "death_yr")) %>%
@@ -255,10 +257,16 @@ for (nm in c("None", "IPSS", "RIPSS", "MSS")) {
 base_vars <- dat %>%
   select(-c("진단일","last_fu","death","death_day","death_yr",
             "B2MG_cat","MYD88","CXCR4",
-            "IPSS","RIPSS","MSS")) %>%
+            "IPSS","RIPSS","MSS",
+            "age65", "PLT100", "IgM7")) %>%
   names()
+base_vars <- c("TLT12")
 
-for (nm in c("None", "IPSS", "RIPSS", "MSS")) {
+var_list <- c("None", "IPSS", "RIPSS", "MSS")
+var_list <- c("IPSS", "RIPSS", "MSS")
+# var_list <- "IPSS"  # 임시로 IPSS 모델만 돌려보기
+
+for (nm in var_list) {
   if (nm == "None") {
     vars <- base_vars
     title_nm <- "None"
@@ -272,30 +280,6 @@ for (nm in c("None", "IPSS", "RIPSS", "MSS")) {
   
   # Full model
   full.model <- coxph(fml, data = dat_complete)
-
-  # ---- VIF 확인 ---- #
-  vif_vals <- car::vif(full.model)
-  
-  # 범주형(GVIF) 처리: vif()가 matrix를 반환하면 GVIF^(1/(2*Df)) 사용
-  if (is.matrix(vif_vals)) {
-    vif_df <- data.frame(
-      Variable = rownames(vif_vals),
-      VIF = (vif_vals[, "GVIF^(1/(2*Df))"])^2
-    )
-  } else {
-    vif_df <- data.frame(
-      Variable = names(vif_vals),
-      VIF = vif_vals
-    )
-  }
-  
-  vif_tbl <- vif_df %>%
-    gt() %>%
-    tab_header(
-      title = sprintf("VIF - %s", ifelse(nm == "None", "Base only", nm))
-    )
-  print(vif_tbl)
-
 
   s <- summary(full.model)
   coefs <- as.data.frame(s$coefficients)
@@ -354,6 +338,208 @@ for (nm in c("None", "IPSS", "RIPSS", "MSS")) {
   
   print(tbl)
 }
+
+
+
+# -- ROC curve 비교 -- #
+library(timeROC)
+
+PRED_TIMES  <- c(5, 10)           # 메인 그림에 쓸 시점
+AUC_TIMES   <- c(1, 3, 5, 7, 10)  # 요약 테이블 / 추세 플롯용 시점
+
+our_vars <- dat %>%
+  select(-c("진단일","last_fu","death","death_day","death_yr",
+            "B2MG_cat","MYD88","CXCR4",
+            "IPSS","RIPSS","MSS")) %>%
+  names()
+# TLT12 빼고 싶으면: our_vars <- setdiff(our_vars, "TLT12")
+
+# IPSS 구성 변수 (dat 컬럼명에 맞춰 수정 필요!)
+# 회의록: age65, HB, Cr, PLT, B2MG, IgM
+ipss_components <- c("age65", "PLT100", "IgM7")
+
+# IPSS + 추가 변수 = IPSS 점수 + (our_vars 중 IPSS 구성 변수 뺀 것)
+extra_vars     <- setdiff(our_vars, ipss_components)
+ipss_plus_vars <- c("IPSS", extra_vars)
+
+# 공통 complete case에서 한 모델 적합 → Cox + timeROC + C-index
+fit_on <- function(vars, dat_cc, times) {
+  vars <- unique(vars)
+  fml  <- as.formula(paste("Surv(death_yr, death) ~",
+                           paste0("`", vars, "`", collapse = " + ")))
+  mod  <- coxph(fml, data = dat_cc)
+  lp   <- predict(mod, type = "lp")
+  
+  tr <- timeROC(T      = dat_cc$death_yr,
+                delta  = dat_cc$death,
+                marker = lp,
+                cause  = 1,
+                times  = times,
+                iid    = TRUE)
+  
+  cidx <- concordance(mod)
+  
+  list(model = mod, timeROC = tr, n = nrow(dat_cc),
+       cindex = cidx$concordance, cindex_se = sqrt(cidx$var))
+}
+
+# var_sets: named list. 모든 변수 union으로 complete case 자른 뒤 각 모델 적합
+fit_models_common <- function(var_sets, data, times) {
+  all_vars <- unique(unlist(var_sets))
+  dat_cc   <- data[, c("death","death_yr", all_vars)] %>% na.omit()
+  message(sprintf("Common complete case N = %d", nrow(dat_cc)))
+  lapply(var_sets, function(v) fit_on(v, dat_cc, times))
+}
+
+# AUC(t) 포맷 (Wald CI)
+fmt_auc_t <- function(res, t) {
+  i <- which(res$timeROC$times == t)
+  a  <- res$timeROC$AUC[i]
+  se <- res$timeROC$inference$vect_sd_1[i]
+  sprintf("%.3f (%.3f-%.3f)", a, a - 1.96*se, a + 1.96*se)
+}
+
+# C-index 포맷
+fmt_cindex <- function(res) {
+  sprintf("%.3f (%.3f-%.3f)",
+          res$cindex,
+          res$cindex - 1.96*res$cindex_se,
+          res$cindex + 1.96*res$cindex_se)
+}
+
+# ROC 패널 그림
+plot_tROC_panel <- function(res_list, colors, time_pt, filename, title_txt = NULL) {
+  png(filename, height = 10, width = 10, units = "in", res = 300)
+  par(pty = "s")
+  for (i in seq_along(res_list)) {
+    plot(res_list[[i]]$timeROC, time = time_pt,
+         col = colors[i], lwd = 3,
+         add = (i != 1), title = FALSE)
+    if (i == 1) title(main = title_txt, cex.main = 1.4)
+  }
+  legend("bottomright",
+         legend = sprintf("%s: AUC = %s (N=%d)",
+                          names(res_list),
+                          sapply(res_list, fmt_auc_t, t = time_pt),
+                          sapply(res_list, function(x) x$n)),
+         col = colors, lwd = 3, cex = 1.0, bty = "n")
+  dev.off()
+}
+
+# 요약 테이블 한 줄
+summary_row <- function(nm, res, times) {
+  row <- data.frame(Model = nm, N = res$n,
+                    `C-index` = fmt_cindex(res),
+                    check.names = FALSE, stringsAsFactors = FALSE)
+  for (t in times) row[[sprintf("AUC(%dyr)", t)]] <- fmt_auc_t(res, t)
+  row
+}
+
+# ============================================================
+# 3. 각 그림별 적합 (공통 N)
+# ============================================================
+
+# (A) Our vs IPSS
+modsA <- fit_models_common(
+  list("Our model" = our_vars, "IPSS" = "IPSS"),
+  dat, AUC_TIMES
+)
+
+# (B) IPSS alone vs IPSS + extras
+modsB <- fit_models_common(
+  list("IPSS alone"    = "IPSS",
+       "IPSS + extras" = ipss_plus_vars),
+  dat, AUC_TIMES
+)
+
+# (C) Supplementary: Our vs three indices
+modsC <- fit_models_common(
+  list("Our model" = our_vars,
+       "IPSS"      = "IPSS",
+       "R-IPSS"    = "RIPSS",
+       "MSS"       = "MSS"),
+  dat, AUC_TIMES
+)
+
+# ============================================================
+# 4. 그림 그리기 (5년, 10년)
+# ============================================================
+for (tp in PRED_TIMES) {
+  plot_tROC_panel(modsA, pal_lancet()(2), tp,
+                  sprintf("ROC_A_ours_vs_IPSS_%dyr.png", tp),
+                  sprintf("Our model vs IPSS (%d-year OS)", tp))
+  
+  plot_tROC_panel(modsB, pal_lancet()(2), tp,
+                  sprintf("ROC_B_IPSS_vs_IPSSplus_%dyr.png", tp),
+                  sprintf("IPSS vs IPSS + additional variables (%d-year OS)", tp))
+  
+  plot_tROC_panel(modsC, pal_lancet()(4), tp,
+                  sprintf("ROC_C_supplementary_%dyr.png", tp),
+                  sprintf("Our model vs prognostic indices (%d-year OS)", tp))
+}
+
+# ============================================================
+# 5. 요약 테이블 (Figure C 세트 기준 — 공통 N)
+# ============================================================
+summary_C <- do.call(rbind,
+  mapply(summary_row,
+         names(modsC), modsC,
+         MoreArgs = list(times = AUC_TIMES),
+         SIMPLIFY = FALSE)
+)
+cat("\n=== Figure C models (common N) ===\n")
+print(summary_C)
+write.csv(summary_C, "tROC_summary_C.csv", row.names = FALSE)
+
+# 각 그림 세트별 테이블
+summary_A <- do.call(rbind, mapply(summary_row, names(modsA), modsA,
+                                    MoreArgs = list(times = AUC_TIMES), SIMPLIFY = FALSE))
+summary_B <- do.call(rbind, mapply(summary_row, names(modsB), modsB,
+                                    MoreArgs = list(times = AUC_TIMES), SIMPLIFY = FALSE))
+write.csv(summary_A, "tROC_summary_A.csv", row.names = FALSE)
+write.csv(summary_B, "tROC_summary_B.csv", row.names = FALSE)
+
+# ============================================================
+# 6. AUC(t) 시간 추세 플롯 (Figure C 모델 기준)
+# ============================================================
+png("AUCt_trajectory.png", height = 8, width = 10, units = "in", res = 300)
+par(pty = "s")
+cols <- pal_lancet()(length(modsC))
+plot(NA, xlim = range(AUC_TIMES), ylim = c(0.5, 1.0),
+     xlab = "Time (years)", ylab = "AUC(t)",
+     main = "Time-dependent AUC over follow-up",
+     cex.lab = 1.3, cex.axis = 1.2, cex.main = 1.4)
+for (i in seq_along(modsC)) {
+  lines(AUC_TIMES, modsC[[i]]$timeROC$AUC,
+        col = cols[i], lwd = 3, type = "b", pch = 19)
+}
+abline(h = 0.5, lty = 2, col = "gray50")
+legend("bottomright", legend = names(modsC),
+       col = cols, lwd = 3, pch = 19, cex = 1.0, bty = "n")
+dev.off()
+
+# ============================================================
+# 7. AUC 쌍비교 (5년 기준)
+# ============================================================
+cat("\n=== AUC comparison tests @ 5yr ===\n")
+
+cat("\n[A] Our vs IPSS:\n")
+print(compare(modsA[["Our model"]]$timeROC, modsA[["IPSS"]]$timeROC, adjusted = TRUE))
+
+cat("\n[B] IPSS vs IPSS+extras:\n")
+print(compare(modsB[["IPSS alone"]]$timeROC, modsB[["IPSS + extras"]]$timeROC, adjusted = TRUE))
+
+cat("\n[C] Our vs IPSS:\n")
+print(compare(modsC[["Our model"]]$timeROC, modsC[["IPSS"]]$timeROC, adjusted = TRUE))
+cat("\n[C] Our vs R-IPSS:\n")
+print(compare(modsC[["Our model"]]$timeROC, modsC[["R-IPSS"]]$timeROC, adjusted = TRUE))
+cat("\n[C] Our vs MSS:\n")
+print(compare(modsC[["Our model"]]$timeROC, modsC[["MSS"]]$timeROC, adjusted = TRUE))
+
+
+
+
+
 
 
 # -- Survival -- #
