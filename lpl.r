@@ -37,6 +37,7 @@ library(gt)
 library(ggsci)
 library(dplyr)
 library(survAUC)
+library(timeROC)
 
 select <- dplyr::select
 
@@ -268,8 +269,6 @@ for (nm in var_list) {
 
 
 # -- ROC curve 비교 -- #
-library(timeROC)
-
 AUC_TIMES <- 1:8
 PLOT_TIMES <- 1:8
 
@@ -320,33 +319,33 @@ for (nm in names(model_sets)) {
 
 colors <- pal_lancet()(length(results))
 
-for (tp in PLOT_TIMES) {
-  png(sprintf("/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Lpl/Figure/Stepwise/ROC_overlay_%dyr.png", tp),
-      height = 8, width = 8, units = "in", res = 300)
-  par(pty = "s", mar = c(5, 5, 4, 2))
+# for (tp in PLOT_TIMES) {
+#   png(sprintf("/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Lpl/Figure/Stepwise/ROC_overlay_%dyr.png", tp),
+#       height = 8, width = 8, units = "in", res = 300)
+#   par(pty = "s", mar = c(5, 5, 4, 2))
 
-  for (i in seq_along(results)) {
-    plot(results[[i]]$timeROC, time = tp,
-        col = colors[i], lwd = 3,
-        add = (i != 1), title = FALSE)
-  }
-  title(main = sprintf("Time-dependent ROC (%d-year OS)", tp),
-        cex.main = 1.3)
+#   for (i in seq_along(results)) {
+#     plot(results[[i]]$timeROC, time = tp,
+#         col = colors[i], lwd = 3,
+#         add = (i != 1), title = FALSE)
+#   }
+#   title(main = sprintf("Time-dependent ROC (%d-year OS)", tp),
+#         cex.main = 1.3)
 
-  legend_labels <- sapply(seq_along(results), function(i) {
-    tr  <- results[[i]]$timeROC
-    idx <- which(tr$times == tp)
-    a   <- tr$AUC[idx]
-    se  <- tr$inference$vect_sd_1[idx]
-    sprintf("%s = %.3f (%.3f–%.3f)",
-            names(results)[i], a, a - 1.96*se, a + 1.96*se)
-  })
-  legend("bottomright", legend = legend_labels,
-        col = colors, lwd = 3, cex = 0.9, bty = "n")
-  dev.off()
+#   legend_labels <- sapply(seq_along(results), function(i) {
+#     tr  <- results[[i]]$timeROC
+#     idx <- which(tr$times == tp)
+#     a   <- tr$AUC[idx]
+#     se  <- tr$inference$vect_sd_1[idx]
+#     sprintf("%s = %.3f (%.3f–%.3f)",
+#             names(results)[i], a, a - 1.96*se, a + 1.96*se)
+#   })
+#   legend("bottomright", legend = legend_labels,
+#         col = colors, lwd = 3, cex = 0.9, bty = "n")
+#   dev.off()
 
-  cat(sprintf("  [%d-year] ROC plotted\n", tp))
-}
+#   cat(sprintf("  [%d-year] ROC plotted\n", tp))
+# }
 
 
 
@@ -375,54 +374,54 @@ results <- list()
 sapply(model_sets, function(v) "TLT12" %in% v)
 # 다 FALSE여야 정상
 
-for (nm in names(model_sets)) {
-  vars <- model_sets[[nm]]
-  fml  <- as.formula(paste("Surv(death_yr, death) ~",
-                           paste0("`", vars, "`", collapse = " + ")))
-  mod  <- coxph(fml, data = dat_cc)
-  lp   <- predict(mod, type = "lp")
+# for (nm in names(model_sets)) {
+#   vars <- model_sets[[nm]]
+#   fml  <- as.formula(paste("Surv(death_yr, death) ~",
+#                            paste0("`", vars, "`", collapse = " + ")))
+#   mod  <- coxph(fml, data = dat_cc)
+#   lp   <- predict(mod, type = "lp")
   
-  tr <- timeROC(T         = dat_cc$death_yr,
-                delta     = dat_cc$death,
-                marker    = lp,
-                cause     = 1,
-                weighting = "marginal",
-                times     = AUC_TIMES,
-                iid       = TRUE)
+#   tr <- timeROC(T         = dat_cc$death_yr,
+#                 delta     = dat_cc$death,
+#                 marker    = lp,
+#                 cause     = 1,
+#                 weighting = "marginal",
+#                 times     = AUC_TIMES,
+#                 iid       = TRUE)
   
-  results[[nm]] <- list(model = mod, timeROC = tr, n = nrow(dat_cc))
-  cat(sprintf("  [%s] fitted (N=%d, p=%d)\n", nm, nrow(dat_cc), length(vars)))
-}
+#   results[[nm]] <- list(model = mod, timeROC = tr, n = nrow(dat_cc))
+#   cat(sprintf("  [%s] fitted (N=%d, p=%d)\n", nm, nrow(dat_cc), length(vars)))
+# }
 
-colors <- pal_lancet()(length(results))
+# colors <- pal_lancet()(length(results))
 
-for (tp in PLOT_TIMES) {
-  png(sprintf("/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Lpl/Figure/Stepwise/ROC_overlay_%dyr.png", tp),
-      height = 8, width = 8, units = "in", res = 300)
-  par(pty = "s", mar = c(5, 5, 4, 2))
+# for (tp in PLOT_TIMES) {
+#   png(sprintf("/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Lpl/Figure/Stepwise/ROC_overlay_%dyr.png", tp),
+#       height = 8, width = 8, units = "in", res = 300)
+#   par(pty = "s", mar = c(5, 5, 4, 2))
 
-  for (i in seq_along(results)) {
-    plot(results[[i]]$timeROC, time = tp,
-        col = colors[i], lwd = 3,
-        add = (i != 1), title = FALSE)
-  }
-  title(main = sprintf("Time-dependent ROC (%d-year OS)", tp),
-        cex.main = 1.3)
+#   for (i in seq_along(results)) {
+#     plot(results[[i]]$timeROC, time = tp,
+#         col = colors[i], lwd = 3,
+#         add = (i != 1), title = FALSE)
+#   }
+#   title(main = sprintf("Time-dependent ROC (%d-year OS)", tp),
+#         cex.main = 1.3)
 
-  legend_labels <- sapply(seq_along(results), function(i) {
-    tr  <- results[[i]]$timeROC
-    idx <- which(tr$times == tp)
-    a   <- tr$AUC[idx]
-    se  <- tr$inference$vect_sd_1[idx]
-    sprintf("%s = %.3f (%.3f–%.3f)",
-            names(results)[i], a, a - 1.96*se, a + 1.96*se)
-  })
-  legend("bottomright", legend = legend_labels,
-        col = colors, lwd = 3, cex = 0.9, bty = "n")
-  dev.off()
+#   legend_labels <- sapply(seq_along(results), function(i) {
+#     tr  <- results[[i]]$timeROC
+#     idx <- which(tr$times == tp)
+#     a   <- tr$AUC[idx]
+#     se  <- tr$inference$vect_sd_1[idx]
+#     sprintf("%s = %.3f (%.3f–%.3f)",
+#             names(results)[i], a, a - 1.96*se, a + 1.96*se)
+#   })
+#   legend("bottomright", legend = legend_labels,
+#         col = colors, lwd = 3, cex = 0.9, bty = "n")
+#   dev.off()
 
-  cat(sprintf("  [%d-year] ROC plotted\n", tp))
-}
+#   cat(sprintf("  [%d-year] ROC plotted\n", tp))
+# }
 
 
 # -- Integrated AUC 계산 -- #
@@ -484,7 +483,7 @@ for (nm in names(model_sets)) {
 }
 
 
-# -- Survival curve by 1L_1 -- #
+# -- Survival model in 1L_1 -- #
 
 dat <- crf %>%
   select(c("1L_1", "TLT12", "age65", "sex", `ECOG performance status < 2`,
@@ -507,165 +506,124 @@ dat <- crf %>%
     `ANC < 1000` = factor(`ANC < 1000`, levels = c(0, 1))
   )
 
-# Landmark: 1년 이상 생존 환자만
-dat_land <- dat[dat$death_yr >= 1, ]
-
-nrow(dat_land)
-
 # first_regimen factor (reference = 1_BR)
-dat_land$first_regimen <- factor(dat_land$`1L_1`,
+dat$first_regimen <- factor(dat$`1L_1`,
   levels = c("1_BR", "2_R_Cy", "3_R_borte", "4_others"))
 
+# -- 1. Regimen 분포 -- #
+regimen_dist <- dat %>%
+  count(first_regimen, name = "N", .drop = FALSE) %>%
+  mutate(
+    Percent = sprintf("%.1f%%", N / sum(N) * 100)
+  )
+
+regimen_dist %>%
+  gt() %>%
+  tab_header(
+    title    = "1st-line regimen distribution"
+  )
+OUTPUT_DIR = "/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Lpl/Figure"
+# Bar chart
+# png(file.path(OUTPUT_DIR, "regimen_distribution.png"),
+#     height = 6, width = 8, units = "in", res = 300)
+# ggplot(dat, aes(x = first_regimen, fill = first_regimen)) +
+#   geom_bar(width = 0.7) +
+#   geom_text(stat = "count", aes(label = after_stat(count)),
+#             vjust = -0.4, size = 5) +
+#   scale_fill_lancet() +
+#   labs(title = "1st-line regimen distribution",
+#        x = NULL, y = "N") +
+#   theme_minimal(base_size = 14) +
+#   theme(legend.position = "none",
+#         plot.title = element_text(face = "bold"))
+# dev.off()
+
+
+dat_1L <- dat %>%
+  filter(!is.na(first_regimen))
+
+base_vars     <- c("age65", "sex", "ECOG performance status < 2", "B_Sx", "LNE", "HS", "IgM7", "ANC < 1000", "PLT100", "LDH2", "ALB3.5") # Base 모델 변수
+ipss_extras   <- c("sex", "ECOG performance status < 2", "B_Sx", "LNE", "HS", "ANC < 1000", "LDH2", "ALB3.5") # IPSS 모델에 추가할 변수들 
 
 model_sets <- list(
-  "Base"        = c("age65", "`ECOG performance status < 2`", "B_Sx",
-                    "`ANC < 1000`", "LDH2", "ALB3.5"),
-  "IPSS+extras" = c("IPSS", "B_Sx", "`ANC < 1000`", "LDH2", "ALB3.5"),
+  "Base"        = base_vars,
+  "IPSS+extras" = c(ipss_extras, "IPSS"),   # IPSS + b_sx, anc, ldh, alb
   "RIPSS"       = "RIPSS"
 )
 
 
-fit <- survfit(Surv(death_yr, death) ~ first_regimen, data = dat_land)
-
-png("survival_by_1L_1.png", height = 10, width = 10, units = "in", res = 300)
-font_size <- 16
-p <- ggsurvplot(
-  fit, data           = dat_land,
-  surv.median.line    = "hv",
-  risk.table          = TRUE,
-  tables.col          = "strata",
-  tables.y.text       = FALSE,
-  conf.int            = FALSE,
-  xlim                = c(0, 12),
-  xlab                = "Time (years)",
-  ylab                = "Survival Probability (%)",
-  legend.title        = "1st-line regimen",
-  legend.labs         = levels(dat_land$first_regimen),
-  tables.height       = 0.25,
-  break.time.by       = 1,
-  risk.table.fontsize = 5,
-  palette             = pal_lancet()(nlevels(dat_land$first_regimen)),
-  tables.theme        = theme_cleantable()
-)
-p$plot <- p$plot +
-  scale_y_continuous(labels = function(x) x * 100) +
-  theme(axis.title  = element_text(size = font_size),
-        axis.text   = element_text(size = font_size),
-        legend.text = element_text(size = font_size - 2))
-print(p)
-dev.off()
-
-
-# -- Median OS --
-med_surv <- as.data.frame(surv_median(fit)) %>%
-  mutate(`Median OS (95% CI)` =
-           sprintf("%.1f (%.1f–%.1f)", median, lower, upper)) %>%
-  select(strata, `Median OS (95% CI)`)
-
-# -- Median follow-up (reverse KM) --
-rev_dat <- dat_land %>% mutate(death_rev = 1 - death)
-fit_rev <- survfit(Surv(death_yr, death_rev) ~ first_regimen, data = rev_dat)
-med_fu  <- as.data.frame(surv_median(fit_rev)) %>%
-  mutate(`Median FU (95% CI)` =
-           sprintf("%.1f (%.1f–%.1f)", median, lower, upper)) %>%
-  select(strata, `Median FU (95% CI)`)
-
-# -- Survival probability at 5yr / 10yr --
-fmt_surv <- function(fit, tp) {
-  s <- summary(fit, times = tp, extend = TRUE)
-  data.frame(
-    strata = as.character(s$strata),
-    value  = sprintf("%.1f%% (%.1f–%.1f)",
-                     s$surv * 100, s$lower * 100, s$upper * 100),
-    stringsAsFactors = FALSE
-  )
-}
-surv_5yr  <- fmt_surv(fit, 5);  names(surv_5yr)[2]  <- "5yr OS (95% CI)"
-surv_10yr <- fmt_surv(fit, 10); names(surv_10yr)[2] <- "10yr OS (95% CI)"
-
-km_summary <- med_surv %>%
-  full_join(med_fu,    by = "strata") %>%
-  full_join(surv_5yr,  by = "strata") %>%
-  full_join(surv_10yr, by = "strata") %>%
-  mutate(Group = gsub("first_regimen=", "", strata)) %>%
-  select(Group, `Median OS (95% CI)`, `Median FU (95% CI)`,
-         `5yr OS (95% CI)`, `10yr OS (95% CI)`)
-
-km_summary %>%
-  gt() %>%
-  tab_header(title    = "Survival summary by 1st-line regimen (unadjusted)",
-             subtitle = "Landmark: 1 year") 
-
-
-mod_unadj <- coxph(Surv(death_yr, death) ~ first_regimen, data = dat_land)
-s_unadj   <- summary(mod_unadj)
-
-unadj_tbl <- data.frame(
-  Group = gsub("^`?first_regimen`?", "", rownames(s_unadj$conf.int)),
-  HR_CI = sprintf("%.2f (%.2f–%.2f)",
-                  s_unadj$conf.int[, "exp(coef)"],
-                  s_unadj$conf.int[, "lower .95"],
-                  s_unadj$conf.int[, "upper .95"]),
-  P     = ifelse(s_unadj$coefficients[, "Pr(>|z|)"] < 0.001, "<.001",
-                 sprintf("%.3f", s_unadj$coefficients[, "Pr(>|z|)"])),
-  stringsAsFactors = FALSE
-)
-
-unadj_tbl %>%
-  gt() %>%
-  cols_label(
-    HR_CI = "Unadjusted HR (95% CI)",
-    P     = "P-value"
-  ) %>%
-  tab_header(
-    title    = "Unadjusted HR for 1st-line regimen",
-    subtitle = sprintf("N = %d", mod_unadj$n)
-  )
-
-extract_1L_HR <- function(model_name, covars) {
-  fml <- as.formula(paste("Surv(death_yr, death) ~ first_regimen +",
-                          paste(covars, collapse = " + ")))
-  mod <- coxph(fml, data = dat_land)
-  s   <- summary(mod)
-  
-  rows_1L <- grep("^`?first_regimen`?", rownames(s$conf.int))
-  
-  data.frame(
-    Model = model_name,
-    Group = rownames(s$conf.int)[rows_1L],
-    N     = mod$n,
-    HR_CI = sprintf("%.2f (%.2f–%.2f)",
-                    s$conf.int[rows_1L, "exp(coef)"],
-                    s$conf.int[rows_1L, "lower .95"],
-                    s$conf.int[rows_1L, "upper .95"]),
-    P     = ifelse(s$coefficients[rows_1L, "Pr(>|z|)"] < 0.001, "<.001",
-                   sprintf("%.3f", s$coefficients[rows_1L, "Pr(>|z|)"])),
-    stringsAsFactors = FALSE
-  )
-}
-
-hr_tbl <- do.call(rbind,
-                  mapply(extract_1L_HR,
-                         names(model_sets), model_sets,
-                         SIMPLIFY = FALSE)) %>%
-  mutate(Group = gsub("^`?first_regimen`?", "", Group))
-
-
 for (nm in names(model_sets)) {
-  sub_tbl <- hr_tbl %>% filter(Model == nm)
-  n_used  <- unique(sub_tbl$N)
+  vars     <- model_sets[[nm]]
+  title_nm <- nm
   
-  tbl <- sub_tbl %>%
-    select(-Model, -N) %>%
+  # formula 구성 시에만 backtick 부착
+  fml <- as.formula(paste(
+    "Surv(death_yr, death) ~",
+    paste0("`", vars, "`", collapse = " + ")
+  ))
+  
+  # 컬럼 선택은 raw name 그대로
+  dat_complete <- dat_1L[, c("death", "death_yr", vars)] %>% na.omit()
+  
+  # Full model
+  full.model <- coxph(fml, data = dat_complete)
+
+  s     <- summary(full.model)
+  coefs <- as.data.frame(s$coefficients)
+  ci    <- as.data.frame(s$conf.int)
+  
+  multi_df <- data.frame(
+    term      = rownames(coefs),
+    multi_HR  = ci[["exp(coef)"]],
+    multi_LCL = ci[["lower .95"]],
+    multi_UCL = ci[["upper .95"]],
+    multi_p   = coefs[["Pr(>|z|)"]],
+    stringsAsFactors = FALSE
+  )
+  
+  # Stepwise
+  step.model <- full.model %>% stepAIC(direction = "both", trace = FALSE)
+  s2     <- summary(step.model)
+  coefs2 <- as.data.frame(s2$coefficients)
+  ci2    <- as.data.frame(s2$conf.int)
+  
+  step_df <- data.frame(
+    term       = rownames(coefs2),
+    step_HR    = ci2[["exp(coef)"]],
+    step_LCL   = ci2[["lower .95"]],
+    step_UCL   = ci2[["upper .95"]],
+    step_p     = coefs2[["Pr(>|z|)"]],
+    step_beta  = coefs2[["coef"]],
+    step_Score = round(coefs2[["coef"]] * 5),
+    stringsAsFactors = FALSE
+  )
+  
+  # Merge + gt
+  tbl <- full_join(multi_df, step_df, by = "term") %>%
+    mutate(
+      multi_ci = sprintf("%.2f (%.2f-%.2f)", multi_HR, multi_LCL, multi_UCL),
+      multi_pv = ifelse(multi_p < 0.001, "<.001", sprintf("%.3f", multi_p)),
+      step_ci  = ifelse(is.na(step_HR), "-",
+                        sprintf("%.2f (%.2f-%.2f)", step_HR, step_LCL, step_UCL)),
+      step_pv  = ifelse(is.na(step_p), "-",
+                        ifelse(step_p < 0.001, "<.001", sprintf("%.3f", step_p))),
+      Beta     = ifelse(is.na(step_beta), "-", sprintf("%.2f", step_beta)),
+      Score    = ifelse(is.na(step_Score), "-", as.character(step_Score))
+    ) %>%
+    select(Variable = term, multi_ci, multi_pv, step_ci, step_pv) %>%
     gt() %>%
     cols_label(
-      HR_CI = "Adjusted HR (95% CI)",
-      P     = "P-value"
+      multi_ci = "HR (95% CI)", multi_pv = "P-value",
+      step_ci  = "HR (95% CI)", step_pv  = "P-value"
     ) %>%
     tab_header(
-      title    = sprintf("Adjusted HR for 1st-line regimen — %s model", nm),
-      subtitle = sprintf("N = %d / %d",
-                         n_used, nrow(dat_land))
-    )  
+      title    = sprintf("Multivariable Cox Regression - %s", title_nm),
+      subtitle = sprintf("Full AIC = %.1f / Step AIC = %.1f, N = %d / %d",
+                         AIC(full.model), AIC(step.model),
+                         full.model$n, nrow(dat_1L))
+    ) %>%
+    tab_spanner(label = "Full Model", columns = c(multi_ci, multi_pv)) %>%
+    tab_spanner(label = "Stepwise",   columns = c(step_ci, step_pv))
+  
   print(tbl)
 }
