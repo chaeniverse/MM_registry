@@ -51,33 +51,33 @@ sub_data <- bind_rows(
   make_row("Overall",          3621, "1535 (42.4%)",  "1049 (29.0%)", "1037 (28.6%)", 1.95, 1.78, 2.13),
 
   # Age
-  make_header("Age", "0.403"),
+  make_header("Age", ".40"),
   make_row("  < 50",            230, "86 (37.4%)",    "75 (32.6%)",   "69 (30.0%)",   1.79, 1.29, 2.52),
   make_row("  50\u201365",     1362, "538 (39.5%)",   "445 (32.7%)",  "379 (27.8%)",  2.14, 1.84, 2.49),
   make_row("  ≥ 65",           2029, "911 (44.9%)",   "529 (26.1%)",  "589 (29.0%)",  1.90, 1.68, 2.14),
 
   # Region
-  make_header("Region", "0.522"),
+  make_header("Region", ".52"),
   make_row("  Metropolitan",   2481, "1081 (43.6%)",  "680 (27.4%)",  "720 (29.0%)",  1.91, 1.72, 2.13),
   make_row("  Province",       1140, "454 (39.8%)",   "369 (32.4%)",  "317 (27.8%)",  2.04, 1.73, 2.43),
 
   # Fracture history
-  make_header("History of fracture", "0.637"),
+  make_header("History of fracture", ".64"),
   make_row("  Yes",             580, "175 (30.2%)",   "199 (34.3%)",  "206 (35.5%)",  1.84, 1.47, 2.33),
   make_row("  No",             3041, "1360 (44.7%)",  "850 (28.0%)",  "831 (27.3%)",  1.96, 1.78, 2.16),
 
   # Mood or sleep disorder
-  make_header("Mood or sleep disorder", "0.670"),
+  make_header("Mood or sleep disorder", ".67"),
   make_row("  Yes",             756, "293 (38.8%)",   "194 (25.7%)",  "269 (35.6%)",  2.01, 1.65, 2.47),
   make_row("  No",             2865, "1242 (43.4%)",  "855 (29.8%)",  "768 (26.8%)",  1.92, 1.74, 2.12),
 
   # Spinal pathology or pain procedure
-  make_header("Spinal pathology or\npain procedure", "0.678"),
+  make_header("Spinal pathology or\npain procedure", ".68"),
   make_row("  Yes",            1942, "789 (40.6%)",   "545 (28.1%)",  "608 (31.3%)",  1.91, 1.69, 2.16),
   make_row("  No",             1679, "746 (44.4%)",   "504 (30.0%)",  "429 (25.6%)",  1.98, 1.74, 2.27),
 
   # Line of therapy
-  make_header("Bortezomib-based therapy", "0.210"),
+  make_header("Bortezomib-based therapy", ".21"),
   make_row("  Bortezomib",     2762, "1165 (42.2%)",  "801 (29.0%)",  "796 (28.8%)",  1.89, 1.70, 2.10),
   make_row("  Other",           859, "370 (43.1%)",   "248 (28.9%)",  "241 (28.1%)",  2.16, 1.81, 2.59)
 )
@@ -105,3 +105,30 @@ p_sub <- forest(
 png("/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Opioid/Figure/Forest_plot.png", height = 7, width = 10, units = "in", res = 300)
 plot(p_sub)
 dev.off()
+
+
+
+# -- E-value 계산 -- #
+library(EValue)
+
+# 1) Strong only vs Weak only
+# aOR = 2.25, 95% CI: 1.90–2.66
+eval_strong <- evalues.OR(
+  est = 2.25,
+  lo = 1.90,
+  hi = 2.66,
+  rare = FALSE   # outcome prevalence가 65.6%로 높음 → rare assumption 불성립
+)
+print(eval_strong)
+print(round(eval_strong, 2))
+
+# 2) Weak and strong vs Weak only
+# aOR = 3.64, 95% CI: 3.02–4.38
+eval_ws <- evalues.OR(
+  est = 3.64,
+  lo = 3.02,
+  hi = 4.38,
+  rare = FALSE
+)
+print(eval_ws)
+print(round(eval_ws, 2))
