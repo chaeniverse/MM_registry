@@ -332,15 +332,39 @@ multi_step("None", dat, base_vars)
 base_vars <- c("age65", "PLT100", "IgM7", "LDH2", "ALB3.5", "B_Sx")
 multi("None", dat, base_vars)
 
+# 4) IPSS 인자 + RIPSS 인자
+base_vars <- c("age75", "PLT100", "IgM7", "LDH2", "ALB3.5")
+multi("None", dat, base_vars)
+multi_step("None", dat, base_vars)
+
+base_vars <- c("age75", "PLT100", "IgM7", "LDH2", "ALB3.5", "B_Sx")
+multi("None", dat, base_vars)
 
 
 
 # -- Score 계산 -- # 
 dat <- dat %>% rename(first_regimen = `1L_1`) %>%
   mutate(
-    ScoreA = 
+    ScoreA65 = 
       case_when(age65 == 1 ~ 1, 
                 age65 == 0 ~ 0, 
+                TRUE ~ NA_real_) +
+      case_when(PLT100 == 1 ~ 1, 
+                PLT100 == 0 ~ 0, 
+                TRUE ~ NA_real_) +
+      case_when(IgM7 == 1 ~ 1, 
+                IgM7 == 0 ~ 0, 
+                TRUE ~ NA_real_) +
+      case_when(LDH2 == 1 ~ 2, 
+                LDH2 == 0 ~ 0, 
+                TRUE ~ NA_real_) +
+      case_when(ALB3.5 == 1 ~ 3, 
+                ALB3.5 == 0 ~ 0, 
+                TRUE ~ NA_real_),
+    ScoreA75 = 
+      case_when(age75 == '<=65' ~ 0, 
+                age75 == '65-75' ~ 0, 
+                age75 == '>75' ~ 4, 
                 TRUE ~ NA_real_) +
       case_when(PLT100 == 1 ~ 1, 
                 PLT100 == 0 ~ 0, 
@@ -370,116 +394,44 @@ dat <- dat %>% rename(first_regimen = `1L_1`) %>%
                 TRUE ~ NA_real_),
 )
 
-base_vars <- c("ScoreA", "B_Sx")
-multi("None", dat, base_vars)
+base_vars <- c("ScoreA65", "B_Sx")
+multi_step("None", dat, base_vars)
+
+base_vars <- c("ScoreA75", "B_Sx")
 multi_step("None", dat, base_vars)
 
 dat <- dat %>% mutate(
-    ScoreD = 
+    ScoreD = ScoreA65 +
+      case_when(B_Sx == 1 ~ 4, 
+                B_Sx == 0 ~ 0, 
+                TRUE ~ NA_real_),
+    ScoreE = ScoreA75 +
       case_when(B_Sx == 1 ~ 4, 
                 B_Sx == 0 ~ 0, 
                 TRUE ~ NA_real_)
   )
   
 # 분포 확인
-summary(dat[, c("ScoreA", "ScoreB", "ScoreC", "ScoreD")])
+summary(dat[, c("ScoreA65", "ScoreA75", "ScoreB", "ScoreC", "ScoreD", "ScoreE")])
 
 # -- score model의 ROC 계산 -- #
-rocA <- roc(dat$death, dat$ScoreA, quiet = TRUE)
+rocA65 <- roc(dat$death, dat$ScoreA65, quiet = TRUE)
+rocA75 <- roc(dat$death, dat$ScoreA75, quiet = TRUE)
 rocB <- roc(dat$death, dat$ScoreB, quiet = TRUE)
 rocC <- roc(dat$death, dat$ScoreC, quiet = TRUE)
 rocD <- roc(dat$death, dat$ScoreD, quiet = TRUE)
+rocE <- roc(dat$death, dat$ScoreE, quiet = TRUE)
 
-ciA <- ci.auc(rocA)
+ciA65 <- ci.auc(rocA65)
+ciA75 <- ci.auc(rocA75)
 ciB <- ci.auc(rocB)
 ciC <- ci.auc(rocC)
 ciD <- ci.auc(rocD)
+ciE <- ci.auc(rocE)
 
-colors <- pal_lancet()(4)[c(2, 3, 1, 4)]   # A, B, C, D 순서대로
+colors <- pal_lancet()(6)[c(2, 3, 1, 4, 5, 6)]   # A, B, C, D, E, F 순서대로
 
-# -- ROC plot -- #
-while (!is.null(dev.list())) dev.off()
-
-png("/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Lpl/Figure/ROC_score.png", width = 8, height = 8, units = "in", res = 300)
-par(pty = "s")
-
-plot(rocA, legacy.axes = TRUE,
-     col = colors[1], lwd = 3,
-     xlab = "1 - Specificity", ylab = "Sensitivity",
-     cex.lab = 1.3, cex.axis = 1.2)
-
-plot(rocB, col = colors[2], lwd = 3, add = TRUE)
-plot(rocC, col = colors[3], lwd = 3, add = TRUE)
-plot(rocD, col = colors[4], lwd = 3, add = TRUE)
-legend("bottomright",
-       legend = c(
-         sprintf("Score A (Our Model):  AUC %.3f (%.3f-%.3f)", auc(rocA), ciA[1], ciA[3]),
-         sprintf("Score B (IPSS):  AUC %.3f (%.3f-%.3f)", auc(rocB), ciB[1], ciB[3]),
-         sprintf("Score C (RIPSS): AUC %.3f (%.3f-%.3f)", auc(rocC), ciC[1], ciC[3]),
-         sprintf("Score D (Our Model + B_Sx): AUC %.3f (%.3f-%.3f)", auc(rocD), ciD[1], ciD[3])
-       ),
-       col = colors,
-       lwd = 3, cex = 0.9, bty = "n")
-
-dev.off()
-
-get_youden <- function(roc_obj) {
-  coords(roc_obj, "best",
-         best.method = "youden",
-         ret = c("threshold", "sensitivity", "specificity", "youden"))
-}
-youdenA <- get_youden(rocA); print(youdenA) #3.5
-youdenB <- get_youden(rocB); print(youdenB) #10.5
-youdenC <- get_youden(rocC); print(youdenC) #2.5
-youdenD <- get_youden(rocD); print(youdenD) #2
-
-plot_score_hist <- function(data, score_var, outcome_var,
-                            outcome_labels = c("Event-", "Event+"),
-                            cutoff = NULL, binwidth = 1,
-                            file = NULL, width = 8, height = 6) {
-
-  data$.score <- data[[score_var]]
-  data$.outcome <- factor(data[[outcome_var]],
-                          levels = c(0, 1), labels = outcome_labels)
-
-  mu <- data %>% group_by(.outcome) %>%
-    summarise(grp.mean = mean(.score, na.rm = TRUE), .groups = "drop")
-
-  p <- ggplot(data, aes(x = .score, fill = .outcome, color = .outcome)) +
-    geom_histogram(aes(y = ..density..),
-                   binwidth = binwidth, alpha = 0.2, position = "identity") +
-    geom_vline(data = mu, aes(xintercept = grp.mean, color = .outcome),
-               linetype = "dashed") +
-    scale_fill_manual(values = pal_lancet()(2), labels = outcome_labels) +
-    scale_color_manual(values = pal_lancet()(2), labels = outcome_labels) +
-    labs(x = score_var, y = "Density", fill = NULL, color = NULL) +
-    theme(
-      panel.background = element_rect(fill = "white"),
-      panel.border = element_rect(fill = NA, colour = "black"),
-      axis.text = element_text(size = 12, colour = "black"),
-      axis.title = element_text(size = 14, colour = "black"),
-      legend.position = "bottom",
-      legend.text = element_text(size = 11)
-    )
-
-  if (!is.null(cutoff)) {
-    p <- p + geom_vline(xintercept = cutoff,
-                        linetype = "dotted", linewidth = 1) +
-      annotate("text", x = cutoff, y = Inf, vjust = 2,
-               label = sprintf("cutoff = %.1f", cutoff))
-  }
-
-  if (!is.null(file)) {
-    ggsave(file, plot = p, width = width, height = height, dpi = 300)
-  }
-  p
-}
-plot_score_hist(dat, "ScoreA", "death", cutoff = youdenA$threshold, file = "/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Lpl/Figure/ScoreA_hist.png")
-plot_score_hist(dat, "ScoreB", "death", cutoff = youdenB$threshold, file = "/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Lpl/Figure/ScoreB_hist.png")
-plot_score_hist(dat, "ScoreC", "death", cutoff = youdenC$threshold, file = "/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Lpl/Figure/ScoreC_hist.png")
-plot_score_hist(dat, "ScoreD", "death", cutoff = youdenD$threshold, file = "/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Lpl/Figure/ScoreD_hist.png")
-
-
+# -- Score별 요약 테이블 -- #
 score_summary_table <- function(data, score_var, outcome_var) {
 
   d <- data
@@ -509,10 +461,12 @@ score_summary_table <- function(data, score_var, outcome_var) {
 }
 
 # -- Score별 event rate table -- #
-score_summary_table(dat, "ScoreA", "death")
+score_summary_table(dat, "ScoreA65", "death")
+score_summary_table(dat, "ScoreA75", "death")
 score_summary_table(dat, "ScoreB", "death")
 score_summary_table(dat, "ScoreC", "death")
 score_summary_table(dat, "ScoreD", "death")
+score_summary_table(dat, "ScoreE", "death")
 
 
 
@@ -520,14 +474,18 @@ score_summary_table(dat, "ScoreD", "death")
 AUC_TIMES <- 1:8
 PLOT_TIMES <- 1:8
 
-base_vars <- c("age65", "PLT100", "IgM7", "LDH2", "ALB3.5")
-base_vars2 <- c("age65", "PLT100", "IgM7", "LDH2", "ALB3.5", "B_Sx")
+base_age65 <- c("age65", "PLT100", "IgM7", "LDH2", "ALB3.5")
+base_age65_score_BSx <- c("ScoreA65", "B_Sx")
+base_age75 <- c("age75", "PLT100", "IgM7", "LDH2", "ALB3.5")
+base_age75_score_BSx <- c("ScoreA75", "B_Sx")
 
 model_sets <- list(
-  "Our model"        = base_vars,
+  "Our model (age65)"        = base_age65,
+  "Our model (age75)"        = base_age75,
   "IPSS"        = "IPSS",
   "RIPSS"       = "RIPSS",
-  "Our score + B_Sx"         = base_vars2
+  "Our model score + B_Sx (age65)" = base_age65_score_BSx,
+  "Our model score + B_Sx (age75)" = base_age75_score_BSx
 )
 
 all_vars <- unique(unlist(model_sets))
@@ -782,19 +740,31 @@ dev.off()
 # -- Survival analysis -- #
 survival <- dat  %>% 
   mutate(
-    groupA = 
+    groupA65 = 
       case_when(
-        ScoreA<=2 ~"Low",
-        ScoreA<=6 ~ "Intermediate",
+        ScoreA65<=1 ~"Low",
+        ScoreA65<=5 ~ "Intermediate",
         T ~ "High"),
-    groupB = 
+    groupA75 = 
       case_when(
-        ScoreB<=10 ~"Low",
-        ScoreB<=15 ~ "Intermediate",
+        ScoreA75<=0 ~"Low",
+        ScoreA75<=5 ~ "Intermediate",
+        T ~ "High"),
+    groupD = 
+      case_when(
+        ScoreD<=1 ~"Low",
+        ScoreD<=4 ~ "Intermediate",
+        T ~ "High"),
+    groupE = 
+      case_when(
+        ScoreE<=0 ~"Low",
+        ScoreE<=5 ~ "Intermediate",
         T ~ "High")
   ) %>% 
-  mutate(groupA = factor(groupA, levels=c("Low","Intermediate","High")),
-         groupB = factor(groupB, levels=c("Low","Intermediate","High")))
+  mutate(groupA65 = factor(groupA65, levels=c("Low","Intermediate","High")),
+         groupA75 = factor(groupA75, levels=c("Low","Intermediate","High")),
+         groupD = factor(groupD, levels=c("Low","Intermediate","High")),
+         groupE = factor(groupE, levels=c("Low","Intermediate","High")))
 
 table(survival$first_regimen)
 
@@ -803,7 +773,7 @@ table(survival$first_regimen)
 # 변경 후: data.frame으로 strata + value 반환 → join 가능
 
 
-plot_regimen <- function(dat, regimen_name, group_var = "groupA"){
+plot_regimen <- function(dat, regimen_name, group_var = "groupA65"){
   fmla <- as.formula(paste0("Surv(as.numeric(death_yr), death) ~ ", group_var))
   fit  <- surv_fit(fmla, data = dat)
 
@@ -838,7 +808,7 @@ plot_regimen <- function(dat, regimen_name, group_var = "groupA"){
 }
 
 
-summary_regimen <- function(dat, regimen_name, group_var = "groupA"){
+summary_regimen <- function(dat, regimen_name, group_var = "groupA65"){
   fmla <- as.formula(paste0("Surv(as.numeric(death_yr), death) ~ ", group_var))
   fit  <- surv_fit(fmla, data = dat)
   cox  <- coxph(fmla, data = dat)
@@ -890,26 +860,33 @@ summary_regimen <- function(dat, regimen_name, group_var = "groupA"){
   list(surv = surv_gt, hr = hr_gt)
 }
 
-
 regimens <- survival %>% filter(!is.na(first_regimen)) %>%
   pull(first_regimen) %>% unique() %>% sort()
 
-# 그림 (2x2 합쳐서 저장)
-plot_list <- lapply(regimens, function(r){
-  plot_regimen(survival %>% filter(first_regimen == r), as.character(r), group_var = "groupB")
-})
+group_name <- c("Our_model_age65", "Our_model_age75", "Our_model_score_BSx_age65", "Our_model_score_BSx_age75")
+for (group_var in c("groupA65", "groupA75", "groupD", "groupE")) {
+  # 그림 (2x2 합쳐서 저장)
+  plot_list <- lapply(regimens, function(r){
+    plot_regimen(survival %>% filter(first_regimen == r), as.character(r), group_var = group_var)
+  })
 
-OUTPUT_DIR="/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Lpl/Figure/"
-dev.new()
-png(paste0(OUTPUT_DIR, "survival_by_regimen_2x1_IPSSextras.png"),
-    width = 16, height = 16, units = "in", res = 300)
-arrange_ggsurvplots(plot_list, ncol = 2, nrow = 2, print = TRUE)
-dev.off()
+  OUTPUT_DIR="/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Lpl/Figure/"
+  dev.new()
+  png(paste0(OUTPUT_DIR, "survival_by_regimen_2x1_", group_name[which(c("groupA65", "groupA75", "groupD", "groupE") == group_var)], ".png"),
+      width = 16, height = 16, units = "in", res = 300)
+  arrange_ggsurvplots(plot_list, ncol = 2, nrow = 2, print = TRUE)
+  dev.off()
+}
 
 # 통계 테이블 (regimen별로 gt 두 개씩)
-for (r in regimens){
-  res <- summary_regimen(survival %>% filter(first_regimen == r), as.character(r), group_var = "groupB")
-  print(res$surv)
-  print(res$hr)
-}
+for (group_var in c("groupA65", "groupA75", "groupD", "groupE")) {
+   cat(sprintf("\n=== Grouping by %s ===\n", group_var))
+   
+   for (r in regimens){
+     res <- summary_regimen(survival %>% filter(first_regimen == r), as.character(r), group_var = group_var)
+     cat(sprintf("\n--- Regimen: %s ---\n", r))
+     print(res$surv)
+     print(res$hr)
+   }
+} 
 
