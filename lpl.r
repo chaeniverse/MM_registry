@@ -24,7 +24,8 @@ library(data.table)
 library(magrittr)
 library(moonBook)
 library(styler)
-library(ggplot2); library(survival); library(survminer)
+library(ggplot2) 
+library(survival)
 library(tibble)
 library(cmprsk)
 library(gmodels)
@@ -113,13 +114,23 @@ crf <- crf %>%
   ),
   `age75` = case_when(
     age <= 65 ~ "<=65",
-    age > 65 & age <= 75 ~ "65-75",
+    age >= 66 & age <= 75 ~ "66-75",
     age > 75 ~ ">75",
     TRUE ~ NA_character_
   ),
   `B2MG4` = case_when(
-    B2MG_cont > 4 ~ 1,
-    B2MG_cont <= 4 ~ 0,
+    B2MG_cont >= 4 ~ 1,
+    B2MG_cont < 4 ~ 0,
+    TRUE ~ NA_integer_
+  ),
+  `Hb11.5` = case_when(
+    Hb <= 11.5 ~ 1,
+    Hb > 11.5 ~ 0,
+    TRUE ~ NA_integer_
+  ),
+  `LDH250` = case_when(
+    LDH > 250 ~ 1,
+    LDH <= 250 ~ 0,
     TRUE ~ NA_integer_
   ),
   `ECOG performance status < 2` = case_when(
@@ -128,15 +139,17 @@ crf <- crf %>%
     TRUE ~ NA_integer_
   )) %>%
   mutate(`1L_1` = factor(`1L_1`, levels = c("BR", "R_Cy or R_borte", "Others"))) %>%
-  mutate(`age75` = factor(`age75`, levels = c("<=65", "65-75", ">75"))) %>%
+  mutate(`age75` = factor(`age75`, levels = c("<=65", "66-75", ">75"))) %>%
   mutate(
     Hb10 = ifelse(is.na(Hb), NA, Hb10),
     Hb11 = ifelse(is.na(Hb), NA, Hb11),
+    `Hb11.5` = ifelse(is.na(Hb), NA, `Hb11.5`),
     PLT100 = ifelse(is.na(PLT), NA, PLT100),
     LDH2 = ifelse(is.na(LDH), NA, LDH2),
+    LDH250 = ifelse(is.na(LDH), NA, LDH250),
     `ALB3.5` = ifelse(is.na(ALB), NA, `ALB3.5`),
     B2MG_cat = ifelse(is.na(B2MG_cont), NA, B2MG_cat),
-    B2MG4 = ifelse(is.na(B2MG_cont), NA, B2MG4)    
+    B2MG4 = ifelse(is.na(B2MG_cont), NA, B2MG4),
   ) %>%
   mutate(
     death   = as.numeric(death),
@@ -158,33 +171,29 @@ crf <- crf %>%
     MYD88 = factor(ifelse(MYD88 == "NA", NA, MYD88)),
     CXCR4 = factor(ifelse(CXCR4 == "NA", NA, CXCR4))
   ) 
-# View(crf)
-crf$`1L_start`
+
 # --- 2-1. 분석용 데이터 준비 ---
-# sPEP 제외
 dat <- crf %>%
   select(
-    c("1L_1", "TLT12", "age65", "sex", `ECOG performance status < 2`, "B_Sx", 
-    "LNE", "HS", "IgM7", "ANC < 1000", "PLT100", "LDH2", 
-    "ALB3.5", "B2MG_cat", "IPSS", "RIPSS", 
-    "MSS", "MYD88", "CXCR4", "진단일","last_fu", 
-    "death","death_day","death_yr", "age75", "B2MG4", "Hb11")) %>%
+    c("1L_1", "TLT12", "age65", "age75", "sex", `ECOG performance status < 2`, "B_Sx", 
+    "LNE", "HS", "IgM7", "ANC < 1000", "PLT100", "LDH250",
+    "ALB3.5", "B2MG_cat", "B2MG4", "Hb11.5", "MYD88", "CXCR4", 
+    "IPSS", "RIPSS", "MSS", 
+    "진단일","last_fu", "death","death_day","death_yr")) %>%
   mutate(
     sex=factor(sex,levels=c("M","F")),
-    age65=factor(age65,levels=c(0,1)),
     `ECOG performance status < 2`=factor(`ECOG performance status < 2`,levels=c(0,1)),
     LNE=factor(LNE,levels=c(0,1)),
     HS=factor(HS,levels=c(0,1)),
-    # Hb10=factor(Hb10,levels=c(0,1)),
-    Hb11=factor(Hb11,levels=c(0,1)),
+    Hb11.5=factor(Hb11.5,levels=c(0,1)),
     PLT100=factor(PLT100,levels=c(0,1)),
     ALB3.5=factor(ALB3.5,levels=c(0,1)),
-    LDH2=factor(LDH2,levels=c(0,1)),
+    LDH250=factor(LDH250,levels=c(0,1)),
     IgM7=factor(IgM7,levels=c(0,1)),
     B2MG_cat=factor(B2MG_cat,levels=c(0,1)),
+    B2MG4=factor(B2MG4,levels=c(0,1)),
     B_Sx=factor(B_Sx,levels=c(0,1)),
-    `ANC < 1000` = factor(`ANC < 1000`, levels = c(0, 1)),
-    `B2MG4` = factor(`B2MG4`, levels = c(0, 1))
+    `ANC < 1000` = factor(`ANC < 1000`, levels = c(0, 1))
   )     
 # View(dat)
 
@@ -251,20 +260,21 @@ multi_step <- function (nm, dat, base_vars) {
       step_Beta = ifelse(is.na(step_beta), "-", sprintf("%.2f", step_beta)),
       step_Score = ifelse(is.na(step_Score), "-", as.character(step_Score))
     ) %>%
-    select(Variable = term, multi_ci, multi_pv, multi_Beta, multi_Score, step_ci, step_pv, step_Beta, step_Score) %>%
+    select(Variable = term, multi_ci, multi_pv, step_ci, step_pv, step_Beta, step_Score) %>%
     gt() %>%
     cols_label(
-      multi_ci = "HR (95% CI)", multi_pv = "P-value", multi_Beta = "Beta", multi_Score = "Score",
+      multi_ci = "HR (95% CI)", multi_pv = "P-value",
       step_ci = "HR (95% CI)", step_pv = "P-value", step_Beta = "Beta", step_Score = "Score"
     ) %>%
     tab_header(
       title = sprintf("Multivariable Cox Regression - %s", title_nm),
       subtitle = sprintf("Full AIC = %.1f / Step AIC = %.1f, N = %d / %d", AIC(full.model), AIC(step.model), full.model$n, nrow(dat))
     ) %>%
-    tab_spanner(label = "Full Model", columns = c(multi_ci, multi_pv, multi_Beta, multi_Score)) %>%
+    tab_spanner(label = "Full Model", columns = c(multi_ci, multi_pv)) %>%
     tab_spanner(label = "Stepwise", columns = c(step_ci, step_pv, step_Beta, step_Score))
   
   print(tbl)
+  invisible(tbl)   # ← 이 한 줄만 추가
 }
 
 # -- Cox PH multivariable only -- #
@@ -314,122 +324,215 @@ multi <- function (nm, dat, base_vars) {
     tab_spanner(label = "Full Model", columns = c(multi_ci, multi_pv))
   
   print(tbl)
+  
 }
 
-# 1) IPSS 변수만 들어간 모델
-multi("IPSS", dat, base_vars = c())
-multi_step("IPSS", dat, base_vars = c())
-
-# 2) RIPSS 변수만 들어간 모델
-multi("RIPSS", dat, base_vars = c())
-multi_step("RIPSS", dat, base_vars = c())
 
 # 3) IPSS 인자 + RIPSS 인자 모델
-base_vars <- c("age65", "PLT100", "IgM7", "LDH2", "ALB3.5")
-multi("None", dat, base_vars)
-multi_step("None", dat, base_vars)
+model_list1 <- list(
+  "age65 + B2MG3"        = c("age65", "Hb11.5", "PLT100", "B2MG_cat", "IgM7", "LDH250", "ALB3.5"),
+  "age65 + B2MG4"           = c("age65", "Hb11.5", "PLT100", "B2MG4",    "IgM7", "LDH250", "ALB3.5"),
+  "age75 + B2MG3"        = c("age75", "Hb11.5", "PLT100", "B2MG_cat", "IgM7", "LDH250", "ALB3.5"),
+  "age75 + B2MG4"           = c("age75", "Hb11.5", "PLT100", "B2MG4",    "IgM7", "LDH250", "ALB3.5"))
 
-base_vars <- c("age65", "PLT100", "IgM7", "LDH2", "ALB3.5", "B_Sx")
-multi("None", dat, base_vars)
+model_list2 <- list(
+  "age65 + B2MG3 + B_Sx" = c("age65", "Hb11.5", "PLT100", "B2MG_cat", "IgM7", "LDH250", "ALB3.5", "B_Sx"),
+  "age65 + B2MG4 + B_Sx"    = c("age65", "Hb11.5", "PLT100", "B2MG4",    "IgM7", "LDH250", "ALB3.5", "B_Sx"),
+  "age75 + B2MG3 + B_Sx" = c("age75", "Hb11.5", "PLT100", "B2MG_cat", "IgM7", "LDH250", "ALB3.5", "B_Sx"),
+  "age75 + B2MG4 + B_Sx"    = c("age75", "Hb11.5", "PLT100", "B2MG4",    "IgM7", "LDH250", "ALB3.5", "B_Sx")
+)
 
-# 4) IPSS 인자 + RIPSS 인자
-base_vars <- c("age75", "PLT100", "IgM7", "LDH2", "ALB3.5")
-multi("None", dat, base_vars)
-multi_step("None", dat, base_vars)
+for (i in seq_along(model_list1)) {
+  cat(sprintf("=== Model: %s ===\n", names(model_list1)[i]))
+  multi_step("None", dat, model_list1[[i]])
+}
 
-base_vars <- c("age75", "PLT100", "IgM7", "LDH2", "ALB3.5", "B_Sx")
-multi("None", dat, base_vars)
+model_list3 <- list(
+  "age65 + B2MG3 + others"        = c("sex", "ECOG performance status < 2", "B_Sx", "LNE", "HS", "ANC < 1000", "age65", "Hb11.5", "PLT100", "B2MG_cat", "IgM7", "LDH250", "ALB3.5"),
+  "age65 + B2MG4 + others"           = c("sex", "ECOG performance status < 2", "B_Sx", "LNE", "HS", "ANC < 1000", "age65", "Hb11.5", "PLT100", "B2MG4",    "IgM7", "LDH250", "ALB3.5"),
+  "age75 + B2MG3 + others"        = c("sex", "ECOG performance status < 2", "B_Sx", "LNE", "HS", "ANC < 1000", "age75", "Hb11.5", "PLT100", "B2MG_cat", "IgM7", "LDH250", "ALB3.5"),
+  "age75 + B2MG4 + others"           = c("sex", "ECOG performance status < 2", "B_Sx", "LNE", "HS", "ANC < 1000", "age75", "Hb11.5", "PLT100", "B2MG4",    "IgM7", "LDH250", "ALB3.5")
+)
+
+for (i in seq_along(model_list)) {
+  cat(sprintf("=== Model: %s ===\n", names(model_list)[i]))
+  multi_step("None", dat, model_list[[i]])
+}
+
+
+plot_timeROC_medianFU <- function(model_list,
+                                  list_name = deparse(substitute(model_list))) {
+
+  all_vars <- unique(unlist(model_list))
+  dat_cc   <- dat[, c("death", "death_yr", all_vars)] %>% na.omit()
+
+  fit_rev   <- survfit(Surv(death_yr, 1 - death) ~ 1, data = dat_cc)
+  median_fu <- as.numeric(summary(fit_rev)$table["median"])
+
+  cat(sprintf("\n========== [%s] Time-dependent ROC @ median FU ==========\n",
+              list_name))
+  cat(sprintf("N = %d | median FU = %.2f yr\n\n", nrow(dat_cc), median_fu))
+
+  results <- list()
+  for (nm in names(model_list)) {
+    vars <- model_list[[nm]]
+    fml  <- as.formula(paste("Surv(death_yr, death) ~",
+                             paste0("`", vars, "`", collapse = " + ")))
+    mod  <- coxph(fml, data = dat_cc)
+    lp   <- predict(mod, type = "lp")
+
+    tr <- timeROC(T = dat_cc$death_yr, delta = dat_cc$death,
+                  marker = lp, cause = 1, weighting = "marginal",
+                  times = median_fu, iid = TRUE)
+
+    idx <- which.min(abs(tr$times - median_fu))
+    auc <- tr$AUC[idx]
+    se  <- tr$inference$vect_sd_1[idx]
+
+
+    results[[nm]] <- list(timeROC = tr, auc = auc, se = se)
+    cat(sprintf("  [%-30s] AUC = %.3f (%.3f-%.3f)\n",
+                nm, auc, auc - 1.96 * se, auc + 1.96 * se))
+  }
+
+  # ---- Plot ----
+  out_dir <- "/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Lpl/Figure/[26-05-11] time-dependent ROC"
+  png_path <- file.path(out_dir, sprintf("ROC_medianFU_%s.png", list_name))
+
+  colors <- pal_lancet()(length(results))
+  png(png_path, height = 8, width = 8, units = "in", res = 300)
+  par(pty = "s", mar = c(5, 5, 4, 2))
+  for (i in seq_along(results)) {
+    plot(results[[i]]$timeROC, time = median_fu,
+         col = colors[i], lwd = 3, add = (i != 1), title = FALSE)
+  }
+  title(main = sprintf("Time-dependent ROC (median FU = %.2f yr) — %s",
+                       median_fu, list_name), cex.main = 1.1)
+  legend_labels <- sapply(seq_along(results), function(i) {
+    r <- results[[i]]
+    sprintf("%s = %.3f (%.3f-%.3f)", names(results)[i],
+            r$auc, r$auc - 1.96 * r$se, r$auc + 1.96 * r$se)
+  })
+  legend("bottomright", legend = legend_labels,
+         col = colors, lwd = 3, cex = 0.8, bty = "n")
+  dev.off()
+  cat(sprintf("\nPlot saved: %s\n", png_path))
+
+  invisible(results)
+}
+
+
+compute_iAUC <- function(model_list,
+                         list_name  = deparse(substitute(model_list)),
+                         iauc_times = 1:8) {
+
+  all_vars <- unique(unlist(model_list))
+  dat_cc   <- dat[, c("death", "death_yr", all_vars)] %>% na.omit()
+
+  cat(sprintf("\n========== [%s] Integrated AUC (times %d-%d yr) ==========\n",
+              list_name, min(iauc_times), max(iauc_times)))
+  cat(sprintf("N = %d\n\n", nrow(dat_cc)))
+
+  # marginal OS 확률 (모델 무관, 한 번만 계산)
+  temp_surv_prop <- summary(
+    survfit(Surv(death_yr, death) ~ 1, data = dat_cc),
+    times = iauc_times, extend = TRUE
+  )$surv
+
+  for (nm in names(model_list)) {
+    vars <- model_list[[nm]]
+    fml  <- as.formula(paste("Surv(death_yr, death) ~",
+                             paste0("`", vars, "`", collapse = " + ")))
+    mod  <- coxph(fml, data = dat_cc)
+    lp   <- predict(mod, type = "lp")
+
+    tr <- timeROC(T = dat_cc$death_yr, delta = dat_cc$death,
+                  marker = lp, cause = 1, weighting = "marginal",
+                  times = iauc_times, iid = TRUE)
+
+    iauc <- IntAUC(tr$AUC, iauc_times, temp_surv_prop,
+                   tmax = max(iauc_times))
+    cat(sprintf("  [%-30s] iAUC = %.3f\n", nm, iauc))
+  }
+}
+
+
+# ---- 호출 ----
+plot_timeROC_medianFU(model_list1)
+plot_timeROC_medianFU(model_list2)
+plot_timeROC_medianFU(model_list3)
+
+compute_iAUC(model_list1)
+compute_iAUC(model_list2)
+compute_iAUC(model_list3)
 
 
 
 # -- Score 계산 -- # 
 dat <- dat %>% rename(first_regimen = `1L_1`) %>%
   mutate(
-    ScoreA65 = 
+    Score_IPSS = 
       case_when(age65 == 1 ~ 1, 
                 age65 == 0 ~ 0, 
                 TRUE ~ NA_real_) +
+      case_when(`Hb11.5` == 1 ~ 1, 
+                `Hb11.5` == 0 ~ 0, 
+                TRUE ~ NA_real_) +
       case_when(PLT100 == 1 ~ 1, 
                 PLT100 == 0 ~ 0, 
                 TRUE ~ NA_real_) +
+      case_when(B2MG_cat == 1 ~ 1, 
+                B2MG_cat == 0 ~ 0, 
+                TRUE ~ NA_real_) +
       case_when(IgM7 == 1 ~ 1, 
                 IgM7 == 0 ~ 0, 
-                TRUE ~ NA_real_) +
-      case_when(LDH2 == 1 ~ 2, 
-                LDH2 == 0 ~ 0, 
-                TRUE ~ NA_real_) +
-      case_when(ALB3.5 == 1 ~ 3, 
-                ALB3.5 == 0 ~ 0, 
                 TRUE ~ NA_real_),
-    ScoreA75 = 
+    Score_RIPSS = 
       case_when(age75 == '<=65' ~ 0, 
-                age75 == '65-75' ~ 0, 
-                age75 == '>75' ~ 4, 
+                age75 == '66-75' ~ 1, 
+                age75 == '>75' ~ 2, 
                 TRUE ~ NA_real_) +
-      case_when(PLT100 == 1 ~ 1, 
-                PLT100 == 0 ~ 0, 
+      case_when(B2MG4 == 1 ~ 1, 
+                B2MG4 == 0 ~ 0, 
                 TRUE ~ NA_real_) +
-      case_when(IgM7 == 1 ~ 1, 
-                IgM7 == 0 ~ 0, 
+      case_when(LDH250 == 1 ~ 1, 
+                LDH250 == 0 ~ 0, 
                 TRUE ~ NA_real_) +
-      case_when(LDH2 == 1 ~ 2, 
-                LDH2 == 0 ~ 0, 
-                TRUE ~ NA_real_) +
-      case_when(ALB3.5 == 1 ~ 3, 
-                ALB3.5 == 0 ~ 0, 
+      case_when(`ALB3.5` == 1 ~ 1, 
+                `ALB3.5` == 0 ~ 0, 
                 TRUE ~ NA_real_),
 
-    ScoreB = 
-      case_when(IPSS == "1_Low"  ~ 0,
-                IPSS == "2_Int"  ~ 10,
-                IPSS == "3_High" ~ 11,
+    Score_Our_B2MG3 = 
+      case_when(`ALB3.5` == 1 ~ 3, 
+                `ALB3.5` == 0 ~ 0, 
                 TRUE ~ NA_real_),
 
-    ScoreC = 
-      case_when(RIPSS == "1_VL"   ~ 0,
-                RIPSS == "2_Low"  ~ 1,
-                RIPSS == "3_Int"  ~ 7,
-                RIPSS == "4_High" ~ 7,
-                RIPSS == "5_VH"   ~ 4,
+    Score_Our_B2MG4 = 
+      case_when(`ALB3.5` == 1 ~ 3, 
+                `ALB3.5` == 0 ~ 0, 
                 TRUE ~ NA_real_),
 )
 
-base_vars <- c("ScoreA65", "B_Sx")
+base_vars <- c("Score_Our_B2MG3", "B_Sx")
 multi_step("None", dat, base_vars)
 
-base_vars <- c("ScoreA75", "B_Sx")
+base_vars <- c("Score_Our_B2MG4", "B_Sx")
 multi_step("None", dat, base_vars)
 
 dat <- dat %>% mutate(
-    ScoreD = ScoreA65 +
+    Score_Our_B2MG3 = Score_Our_B2MG3 +
       case_when(B_Sx == 1 ~ 4, 
                 B_Sx == 0 ~ 0, 
                 TRUE ~ NA_real_),
-    ScoreE = ScoreA75 +
+    Score_Our_B2MG4 = Score_Our_B2MG4 +
       case_when(B_Sx == 1 ~ 4, 
                 B_Sx == 0 ~ 0, 
                 TRUE ~ NA_real_)
   )
   
 # 분포 확인
-summary(dat[, c("ScoreA65", "ScoreA75", "ScoreB", "ScoreC", "ScoreD", "ScoreE")])
+summary(dat[, c("Score_IPSS", "Score_RIPSS", "Score_Our_B2MG3", "Score_Our_B2MG4")])
 
-# -- score model의 ROC 계산 -- #
-rocA65 <- roc(dat$death, dat$ScoreA65, quiet = TRUE)
-rocA75 <- roc(dat$death, dat$ScoreA75, quiet = TRUE)
-rocB <- roc(dat$death, dat$ScoreB, quiet = TRUE)
-rocC <- roc(dat$death, dat$ScoreC, quiet = TRUE)
-rocD <- roc(dat$death, dat$ScoreD, quiet = TRUE)
-rocE <- roc(dat$death, dat$ScoreE, quiet = TRUE)
-
-ciA65 <- ci.auc(rocA65)
-ciA75 <- ci.auc(rocA75)
-ciB <- ci.auc(rocB)
-ciC <- ci.auc(rocC)
-ciD <- ci.auc(rocD)
-ciE <- ci.auc(rocE)
-
-colors <- pal_lancet()(6)[c(2, 3, 1, 4, 5, 6)]   # A, B, C, D, E, F 순서대로
 
 # -- Score별 요약 테이블 -- #
 score_summary_table <- function(data, score_var, outcome_var) {
@@ -444,11 +547,13 @@ score_summary_table <- function(data, score_var, outcome_var) {
               Event = sum(.y == 1, na.rm = TRUE),
               Event_Rate = round(Event / N * 100, 1),
               .groups = "drop") %>%
-    arrange(Score)
+    arrange(Score) %>%
+    mutate(Score = ifelse(is.na(Score), "NA", as.character(Score)))
+    
 
   # Total 행 추가
   total <- d %>% summarise(
-    Score = NA_real_,
+    Score = "Total",
     N = n(),
     Event = sum(.y == 1, na.rm = TRUE),
     Event_Rate = round(Event / N * 100, 1)
@@ -461,129 +566,12 @@ score_summary_table <- function(data, score_var, outcome_var) {
 }
 
 # -- Score별 event rate table -- #
-score_summary_table(dat, "ScoreA65", "death")
-score_summary_table(dat, "ScoreA75", "death")
-score_summary_table(dat, "ScoreB", "death")
-score_summary_table(dat, "ScoreC", "death")
-score_summary_table(dat, "ScoreD", "death")
-score_summary_table(dat, "ScoreE", "death")
+score_summary_table(dat, "Score_IPSS", "death")
+score_summary_table(dat, "Score_RIPSS", "death")
+score_summary_table(dat, "Score_Our_B2MG3", "death")
+score_summary_table(dat, "Score_Our_B2MG4", "death")
 
 
-
-# -- time-dependent ROC -- #
-AUC_TIMES <- 1:8
-PLOT_TIMES <- 1:8
-
-base_age65 <- c("age65", "PLT100", "IgM7", "LDH2", "ALB3.5")
-base_age65_score_BSx <- c("ScoreA65", "B_Sx")
-base_age75 <- c("age75", "PLT100", "IgM7", "LDH2", "ALB3.5")
-base_age75_score_BSx <- c("ScoreA75", "B_Sx")
-
-model_sets <- list(
-  "Our model (age65)"        = base_age65,
-  "Our model (age75)"        = base_age75,
-  "IPSS"        = "IPSS",
-  "RIPSS"       = "RIPSS",
-  "Our model score + B_Sx (age65)" = base_age65_score_BSx,
-  "Our model score + B_Sx (age75)" = base_age75_score_BSx
-)
-
-all_vars <- unique(unlist(model_sets))
-dat_cc   <- dat[, c("death", "death_yr", all_vars)] %>% na.omit()
-cat(sprintf("Common complete case N = %d\n", nrow(dat_cc)))
-
-results <- list()
-sapply(model_sets, function(v) "TLT12" %in% v)
-# 다 FALSE여야 정상
-
-for (nm in names(model_sets)) {
-  vars <- model_sets[[nm]]
-  fml  <- as.formula(paste("Surv(death_yr, death) ~",
-                           paste0("`", vars, "`", collapse = " + ")))
-  mod  <- coxph(fml, data = dat_cc)
-  lp   <- predict(mod, type = "lp")
-  
-  tr <- timeROC(T         = dat_cc$death_yr,
-                delta     = dat_cc$death,
-                marker    = lp,
-                cause     = 1,
-                weighting = "marginal",
-                times     = AUC_TIMES,
-                iid       = TRUE)
-  
-  results[[nm]] <- list(model = mod, timeROC = tr, n = nrow(dat_cc))
-  cat(sprintf("  [%s] fitted (N=%d, p=%d)\n", nm, nrow(dat_cc), length(vars)))
-}
-
-colors <- pal_lancet()(length(results))
-
-for (tp in PLOT_TIMES) {
-  png(sprintf("/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Lpl/Figure/Stepwise/ROC_overlay_%dyr.png", tp),
-      height = 8, width = 8, units = "in", res = 300)
-  par(pty = "s", mar = c(5, 5, 4, 2))
-
-  for (i in seq_along(results)) {
-    plot(results[[i]]$timeROC, time = tp,
-        col = colors[i], lwd = 3,
-        add = (i != 1), title = FALSE)
-  }
-  title(main = sprintf("Time-dependent ROC (%d-year OS)", tp),
-        cex.main = 1.3)
-
-  legend_labels <- sapply(seq_along(results), function(i) {
-    tr  <- results[[i]]$timeROC
-    idx <- which(tr$times == tp)
-    a   <- tr$AUC[idx]
-    se  <- tr$inference$vect_sd_1[idx]
-    sprintf("%s = %.3f (%.3f–%.3f)",
-            names(results)[i], a, a - 1.96*se, a + 1.96*se)
-  })
-  legend("bottomright", legend = legend_labels,
-        col = colors, lwd = 3, cex = 0.9, bty = "n")
-  dev.off()
-
-  cat(sprintf("  [%d-year] ROC plotted\n", tp))
-}
-
-
-# Integrated AUC 계산
-
-results <- list()
-
-for (nm in names(model_sets)) {
-  vars <- model_sets[[nm]]
-  fml  <- as.formula(paste("Surv(death_yr, death) ~",
-                           paste0("`", vars, "`", collapse = " + ")))
-  mod  <- coxph(fml, data = dat_cc)
-  lp   <- predict(mod, type = "lp")
-  
-  tr <- timeROC(T         = dat_cc$death_yr,
-                delta     = dat_cc$death,
-                marker    = lp,
-                cause     = 1,
-                weighting = "marginal",
-                times     = AUC_TIMES,
-                iid       = TRUE)
-  
-  # 각 AUC_TIMES 시점의 marginal OS 확률 (IntAUC 가중치용)
-  temp_surv_prop <- summary(
-    survfit(Surv(death_yr, death) ~ 1, data = dat_cc),
-    times  = AUC_TIMES,
-    extend = TRUE
-  )$surv
-  
-  # Integrated AUC
-  iauc <- IntAUC(tr$AUC, AUC_TIMES, temp_surv_prop,
-                 tmax = max(AUC_TIMES))
-  
-  results[[nm]] <- list(model   = mod,
-                        timeROC = tr,
-                        n       = nrow(dat_cc),
-                        iauc    = iauc)
-  
-  cat(sprintf("  [%s] fitted (N=%d, p=%d) | iAUC=%.3f\n",
-              nm, nrow(dat_cc), length(vars), iauc))
-}
 
 
 # ---- Survival curve by 1L_1 ---- #
