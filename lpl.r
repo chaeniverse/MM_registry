@@ -328,38 +328,6 @@ multi <- function (nm, dat, base_vars) {
 }
 
 
-# 3) IPSS 인자 + RIPSS 인자 모델
-model_list1 <- list(
-  "age65 + B2MG3"        = c("age65", "Hb11.5", "PLT100", "B2MG_cat", "IgM7", "LDH250", "ALB3.5"),
-  "age65 + B2MG4"           = c("age65", "Hb11.5", "PLT100", "B2MG4",    "IgM7", "LDH250", "ALB3.5"),
-  "age75 + B2MG3"        = c("age75", "Hb11.5", "PLT100", "B2MG_cat", "IgM7", "LDH250", "ALB3.5"),
-  "age75 + B2MG4"           = c("age75", "Hb11.5", "PLT100", "B2MG4",    "IgM7", "LDH250", "ALB3.5"))
-
-model_list2 <- list(
-  "age65 + B2MG3 + B_Sx" = c("age65", "Hb11.5", "PLT100", "B2MG_cat", "IgM7", "LDH250", "ALB3.5", "B_Sx"),
-  "age65 + B2MG4 + B_Sx"    = c("age65", "Hb11.5", "PLT100", "B2MG4",    "IgM7", "LDH250", "ALB3.5", "B_Sx"),
-  "age75 + B2MG3 + B_Sx" = c("age75", "Hb11.5", "PLT100", "B2MG_cat", "IgM7", "LDH250", "ALB3.5", "B_Sx"),
-  "age75 + B2MG4 + B_Sx"    = c("age75", "Hb11.5", "PLT100", "B2MG4",    "IgM7", "LDH250", "ALB3.5", "B_Sx")
-)
-
-for (i in seq_along(model_list1)) {
-  cat(sprintf("=== Model: %s ===\n", names(model_list1)[i]))
-  multi_step("None", dat, model_list1[[i]])
-}
-
-model_list3 <- list(
-  "age65 + B2MG3 + others"        = c("sex", "ECOG performance status < 2", "B_Sx", "LNE", "HS", "ANC < 1000", "age65", "Hb11.5", "PLT100", "B2MG_cat", "IgM7", "LDH250", "ALB3.5"),
-  "age65 + B2MG4 + others"           = c("sex", "ECOG performance status < 2", "B_Sx", "LNE", "HS", "ANC < 1000", "age65", "Hb11.5", "PLT100", "B2MG4",    "IgM7", "LDH250", "ALB3.5"),
-  "age75 + B2MG3 + others"        = c("sex", "ECOG performance status < 2", "B_Sx", "LNE", "HS", "ANC < 1000", "age75", "Hb11.5", "PLT100", "B2MG_cat", "IgM7", "LDH250", "ALB3.5"),
-  "age75 + B2MG4 + others"           = c("sex", "ECOG performance status < 2", "B_Sx", "LNE", "HS", "ANC < 1000", "age75", "Hb11.5", "PLT100", "B2MG4",    "IgM7", "LDH250", "ALB3.5")
-)
-
-for (i in seq_along(model_list)) {
-  cat(sprintf("=== Model: %s ===\n", names(model_list)[i]))
-  multi_step("None", dat, model_list[[i]])
-}
-
-
 plot_timeROC_medianFU <- function(model_list,
                                   list_name = deparse(substitute(model_list))) {
 
@@ -456,18 +424,6 @@ compute_iAUC <- function(model_list,
   }
 }
 
-
-# ---- 호출 ----
-plot_timeROC_medianFU(model_list1)
-plot_timeROC_medianFU(model_list2)
-plot_timeROC_medianFU(model_list3)
-
-compute_iAUC(model_list1)
-compute_iAUC(model_list2)
-compute_iAUC(model_list3)
-
-
-
 # -- Score 계산 -- # 
 dat <- dat %>% rename(first_regimen = `1L_1`) %>%
   mutate(
@@ -500,40 +456,54 @@ dat <- dat %>% rename(first_regimen = `1L_1`) %>%
                 TRUE ~ NA_real_) +
       case_when(`ALB3.5` == 1 ~ 1, 
                 `ALB3.5` == 0 ~ 0, 
-                TRUE ~ NA_real_),
-
-    Score_Our_B2MG3 = 
-      case_when(`ALB3.5` == 1 ~ 3, 
-                `ALB3.5` == 0 ~ 0, 
-                TRUE ~ NA_real_),
-
-    Score_Our_B2MG4 = 
-      case_when(`ALB3.5` == 1 ~ 3, 
-                `ALB3.5` == 0 ~ 0, 
-                TRUE ~ NA_real_),
+                TRUE ~ NA_real_)
 )
 
-base_vars <- c("Score_Our_B2MG3", "B_Sx")
-multi_step("None", dat, base_vars)
 
-base_vars <- c("Score_Our_B2MG4", "B_Sx")
-multi_step("None", dat, base_vars)
+# ---- 호출 ----
+score_list <- list(
+  IPSS  = "Score_IPSS",
+  RIPSS = "Score_RIPSS"
+)
 
-dat <- dat %>% mutate(
-    Score_Our_B2MG3 = Score_Our_B2MG3 +
-      case_when(B_Sx == 1 ~ 4, 
+# median FU에서 time-dependent ROC
+roc_res <- plot_timeROC_medianFU(score_list, list_name = "Scores")
+
+# Integrated AUC (1-8년)
+compute_iAUC(score_list, list_name = "Scores", iauc_times = 1:8)
+
+base_vars <- c("Score_RIPSS", "sex", "ECOG performance status < 2", "B_Sx", "LNE", "HS", "ANC < 1000", "Hb11.5", "PLT100", "IgM7")
+multi_step("None", dat, base_vars) 
+
+dat <- dat %>% 
+  mutate(
+    `Score_RIPSS_Others` = Score_RIPSS +
+      case_when(B_Sx == 1 ~ 2, 
                 B_Sx == 0 ~ 0, 
-                TRUE ~ NA_real_),
-    Score_Our_B2MG4 = Score_Our_B2MG4 +
-      case_when(B_Sx == 1 ~ 4, 
-                B_Sx == 0 ~ 0, 
+                TRUE ~ NA_real_) +
+      case_when(`ANC < 1000` == 1 ~ 5, 
+                `ANC < 1000` == 0 ~ 0, 
                 TRUE ~ NA_real_)
-  )
-  
-# 분포 확인
-summary(dat[, c("Score_IPSS", "Score_RIPSS", "Score_Our_B2MG3", "Score_Our_B2MG4")])
+)
+
+# 3) IPSS 인자 + RIPSS 인자 모델
+model_list3 <- list(
+  "IPSS score"        = c("Score_IPSS"),
+  "RIPSS score"        = c("Score_RIPSS"),
+  "RIPSS-augmented model"        = c("Score_RIPSS", "B_Sx", "ANC < 1000"),
+  "RIPSS-augmented score"        = c("Score_RIPSS_Others")
+)
+
+plot_timeROC_medianFU(model_list3, list_name = "Scores with RIPSS-augmented")
+
+compute_iAUC(model_list3, list_name = "Scores with RIPSS-augmented", iauc_times = 1:8)
 
 
+
+
+
+
+# 아래부터는 확인하면서 하기
 # -- Score별 요약 테이블 -- #
 score_summary_table <- function(data, score_var, outcome_var) {
 
