@@ -327,6 +327,69 @@ multi <- function (nm, dat, base_vars) {
   
 }
 
+# -- Score 계산 -- # 
+dat <- dat %>% rename(first_regimen = `1L_1`) %>%
+  mutate(
+    Score_IPSS = 
+      case_when(age65 == 1 ~ 1, 
+                age65 == 0 ~ 0, 
+                TRUE ~ NA_real_) +
+      case_when(`Hb11.5` == 1 ~ 1, 
+                `Hb11.5` == 0 ~ 0, 
+                TRUE ~ NA_real_) +
+      case_when(PLT100 == 1 ~ 1, 
+                PLT100 == 0 ~ 0, 
+                TRUE ~ NA_real_) +
+      case_when(B2MG_cat == 1 ~ 1, 
+                B2MG_cat == 0 ~ 0, 
+                TRUE ~ NA_real_) +
+      case_when(IgM7 == 1 ~ 1, 
+                IgM7 == 0 ~ 0, 
+                TRUE ~ NA_real_),
+    Score_RIPSS = 
+      case_when(age75 == '<=65' ~ 0, 
+                age75 == '66-75' ~ 1, 
+                age75 == '>75' ~ 2, 
+                TRUE ~ NA_real_) +
+      case_when(B2MG4 == 1 ~ 1, 
+                B2MG4 == 0 ~ 0, 
+                TRUE ~ NA_real_) +
+      case_when(LDH250 == 1 ~ 1, 
+                LDH250 == 0 ~ 0, 
+                TRUE ~ NA_real_) +
+      case_when(`ALB3.5` == 1 ~ 1, 
+                `ALB3.5` == 0 ~ 0, 
+                TRUE ~ NA_real_)
+)
+
+
+# 3) IPSS 인자 + RIPSS 인자 모델
+model_list1 <- list(
+  IPSS  = "Score_IPSS",
+  RIPSS = "Score_RIPSS",
+  "age65 + B2MG3"        = c("ALB3.5"),
+  "age65 + B2MG4"           = c("ALB3.5"),
+  "age75 + B2MG3"        = c("ALB3.5"),
+  "age75 + B2MG4"           = c("ALB3.5"))
+
+model_list2 <- list(
+  IPSS  = "Score_IPSS",
+  RIPSS = "Score_RIPSS",
+  "age65 + B2MG3 + B_Sx" = c("ALB3.5", "B_Sx"),
+  "age65 + B2MG4 + B_Sx"    = c("ALB3.5", "B_Sx"),
+  "age75 + B2MG3 + B_Sx" = c("ALB3.5", "B_Sx"),
+  "age75 + B2MG4 + B_Sx"    = c("ALB3.5", "B_Sx")
+)
+
+
+model_list3 <- list(
+  IPSS  = "Score_IPSS",
+  RIPSS = "Score_RIPSS",
+  "age65 + B2MG3 + others"        = c("B_Sx", "ANC < 1000", "LDH250"),
+  "age65 + B2MG4 + others"           = c("B_Sx", "ANC < 1000", "LDH250"),
+  "age75 + B2MG3 + others"        = c("B_Sx", "ANC < 1000", "age75", "LDH250"),
+  "age75 + B2MG4 + others"           = c("B_Sx", "ANC < 1000", "age75", "LDH250")
+)
 
 plot_timeROC_medianFU <- function(model_list,
                                   list_name = deparse(substitute(model_list))) {
@@ -424,427 +487,14 @@ compute_iAUC <- function(model_list,
   }
 }
 
-# -- Score 계산 -- # 
-dat <- dat %>% rename(first_regimen = `1L_1`) %>%
-  mutate(
-    Score_IPSS = 
-      case_when(age65 == 1 ~ 1, 
-                age65 == 0 ~ 0, 
-                TRUE ~ NA_real_) +
-      case_when(`Hb11.5` == 1 ~ 1, 
-                `Hb11.5` == 0 ~ 0, 
-                TRUE ~ NA_real_) +
-      case_when(PLT100 == 1 ~ 1, 
-                PLT100 == 0 ~ 0, 
-                TRUE ~ NA_real_) +
-      case_when(B2MG_cat == 1 ~ 1, 
-                B2MG_cat == 0 ~ 0, 
-                TRUE ~ NA_real_) +
-      case_when(IgM7 == 1 ~ 1, 
-                IgM7 == 0 ~ 0, 
-                TRUE ~ NA_real_),
-    Score_RIPSS = 
-      case_when(age75 == '<=65' ~ 0, 
-                age75 == '66-75' ~ 1, 
-                age75 == '>75' ~ 2, 
-                TRUE ~ NA_real_) +
-      case_when(B2MG4 == 1 ~ 1, 
-                B2MG4 == 0 ~ 0, 
-                TRUE ~ NA_real_) +
-      case_when(LDH250 == 1 ~ 1, 
-                LDH250 == 0 ~ 0, 
-                TRUE ~ NA_real_) +
-      case_when(`ALB3.5` == 1 ~ 1, 
-                `ALB3.5` == 0 ~ 0, 
-                TRUE ~ NA_real_)
-)
-
 
 # ---- 호출 ----
-score_list <- list(
-  IPSS  = "Score_IPSS",
-  RIPSS = "Score_RIPSS"
-)
+plot_timeROC_medianFU(model_list1)
+plot_timeROC_medianFU(model_list2)
+plot_timeROC_medianFU(model_list3)
 
-# median FU에서 time-dependent ROC
-roc_res <- plot_timeROC_medianFU(score_list, list_name = "Scores")
+compute_iAUC(model_list1)
+compute_iAUC(model_list2)
+compute_iAUC(model_list3)
 
-# Integrated AUC (1-8년)
-compute_iAUC(score_list, list_name = "Scores", iauc_times = 1:8)
-
-base_vars <- c("Score_RIPSS", "sex", "ECOG performance status < 2", "B_Sx", "LNE", "HS", "ANC < 1000", "Hb11.5", "PLT100", "IgM7")
-multi_step("None", dat, base_vars) 
-
-dat <- dat %>% 
-  mutate(
-    `Score_RIPSS_Others` = Score_RIPSS +
-      case_when(B_Sx == 1 ~ 2, 
-                B_Sx == 0 ~ 0, 
-                TRUE ~ NA_real_) +
-      case_when(`ANC < 1000` == 1 ~ 5, 
-                `ANC < 1000` == 0 ~ 0, 
-                TRUE ~ NA_real_)
-)
-
-# 3) IPSS 인자 + RIPSS 인자 모델
-model_list3 <- list(
-  "IPSS score"        = c("Score_IPSS"),
-  "RIPSS score"        = c("Score_RIPSS"),
-  "RIPSS-augmented model"        = c("Score_RIPSS", "B_Sx", "ANC < 1000"),
-  "RIPSS-augmented score"        = c("Score_RIPSS_Others")
-)
-
-plot_timeROC_medianFU(model_list3, list_name = "Scores with RIPSS-augmented")
-
-compute_iAUC(model_list3, list_name = "Scores with RIPSS-augmented", iauc_times = 1:8)
-
-
-
-
-
-
-# 아래부터는 확인하면서 하기
-# -- Score별 요약 테이블 -- #
-score_summary_table <- function(data, score_var, outcome_var) {
-
-  d <- data
-  d$.score <- d[[score_var]]
-  d$.y     <- d[[outcome_var]]
-
-  # Score별 N / Event / Event rate
-  per_score <- d %>% group_by(Score = .score) %>%
-    summarise(N = n(),
-              Event = sum(.y == 1, na.rm = TRUE),
-              Event_Rate = round(Event / N * 100, 1),
-              .groups = "drop") %>%
-    arrange(Score) %>%
-    mutate(Score = ifelse(is.na(Score), "NA", as.character(Score)))
-    
-
-  # Total 행 추가
-  total <- d %>% summarise(
-    Score = "Total",
-    N = n(),
-    Event = sum(.y == 1, na.rm = TRUE),
-    Event_Rate = round(Event / N * 100, 1)
-  )
-
-  bind_rows(
-    per_score,
-    total
-  ) |> gt()
-}
-
-# -- Score별 event rate table -- #
-score_summary_table(dat, "Score_IPSS", "death")
-score_summary_table(dat, "Score_RIPSS", "death")
-score_summary_table(dat, "Score_Our_B2MG3", "death")
-score_summary_table(dat, "Score_Our_B2MG4", "death")
-
-
-
-
-# ---- Survival curve by 1L_1 ---- #
-format_median <- function(fit){
-  m <- surv_median(fit)
-  data.frame(
-    strata = as.character(m[[1]]),
-    value  = sprintf("%.1f (%.1f-%.1f)", m[, 2], m[, 3], m[, 4]),
-    stringsAsFactors = FALSE
-  )
-}
-
-format_surv <- function(fit, time_point){
-  s <- summary(fit, times = time_point, extend = TRUE)
-  data.frame(
-    strata = as.character(s$strata),
-    value  = sprintf("%.1f%% (%.1f-%.1f)", s$surv*100, s$lower*100, s$upper*100),
-    stringsAsFactors = FALSE
-  )
-}
-
-
-fit <- survfit(Surv(death_yr, death) ~ first_regimen, data = dat)
-
-OUTPUT_DIR="/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Lpl/Figure/"
-png(paste0(OUTPUT_DIR, "survival_by_1L_1.png"), height = 10, width = 10, units = "in", res = 300)
-font_size <- 16
-p <- ggsurvplot(
-  fit, data           = dat,
-  surv.median.line    = "hv",
-  risk.table          = TRUE,
-  tables.col          = "strata",
-  tables.y.text       = FALSE,
-  conf.int            = FALSE,
-  xlim                = c(0, 12),
-  xlab                = "Time (years)",
-  ylab                = "Survival Probability (%)",
-  legend.title        = "1st-line regimen",
-  legend.labs         = levels(dat$first_regimen),
-  tables.height       = 0.25,
-  break.time.by       = 1,
-  risk.table.fontsize = 5,
-  palette             = pal_lancet()(nlevels(dat$first_regimen)),
-  tables.theme        = theme_cleantable()
-)
-p$plot <- p$plot +
-  scale_y_continuous(labels = function(x) x * 100) +
-  theme(axis.title  = element_text(size = font_size),
-        axis.text   = element_text(size = font_size),
-        legend.text = element_text(size = font_size - 2))
-print(p)
-dev.off()
-
-
-# -- Median OS --
-med_surv <- as.data.frame(surv_median(fit)) %>%
-  mutate(`Median OS (95% CI)` =
-           sprintf("%.1f (%.1f–%.1f)", median, lower, upper)) %>%
-  select(strata, `Median OS (95% CI)`)
-
-# -- Median follow-up (reverse KM) --
-rev_dat <- dat %>% mutate(death_rev = 1 - death)
-fit_rev <- survfit(Surv(death_yr, death_rev) ~ first_regimen, data = rev_dat)
-med_fu  <- as.data.frame(surv_median(fit_rev)) %>%
-  mutate(`Median FU (95% CI)` =
-           sprintf("%.1f (%.1f–%.1f)", median, lower, upper)) %>%
-  select(strata, `Median FU (95% CI)`)
-
-# -- Survival probability at 5yr / 10yr --
-fmt_surv <- function(fit, tp) {
-  s <- summary(fit, times = tp, extend = TRUE)
-  data.frame(
-    strata = as.character(s$strata),
-    value  = sprintf("%.1f%% (%.1f–%.1f)",
-                     s$surv * 100, s$lower * 100, s$upper * 100),
-    stringsAsFactors = FALSE
-  )
-}
-surv_5yr  <- fmt_surv(fit, 5);  names(surv_5yr)[2]  <- "5yr OS (95% CI)"
-surv_10yr <- fmt_surv(fit, 10); names(surv_10yr)[2] <- "10yr OS (95% CI)"
-
-km_summary <- med_surv %>%
-  full_join(med_fu,    by = "strata") %>%
-  full_join(surv_5yr,  by = "strata") %>%
-  full_join(surv_10yr, by = "strata") %>%
-  mutate(Group = gsub("first_regimen=", "", strata)) %>%
-  select(Group, `Median OS (95% CI)`, `Median FU (95% CI)`,
-         `5yr OS (95% CI)`, `10yr OS (95% CI)`)
-
-km_summary %>%
-  gt() %>%
-  tab_header(title    = "Survival summary by 1st-line regimen") 
-
-nrow(dat)
-mod_unadj <- coxph(Surv(death_yr, death) ~ first_regimen, data = dat)
-s_unadj   <- summary(mod_unadj)
-
-unadj_tbl <- data.frame(
-  Group = gsub("^`?first_regimen`?", "", rownames(s_unadj$conf.int)),
-  HR_CI = sprintf("%.2f (%.2f–%.2f)",
-                  s_unadj$conf.int[, "exp(coef)"],
-                  s_unadj$conf.int[, "lower .95"],
-                  s_unadj$conf.int[, "upper .95"]),
-  P     = ifelse(s_unadj$coefficients[, "Pr(>|z|)"] < 0.001, "<.001",
-                 sprintf("%.3f", s_unadj$coefficients[, "Pr(>|z|)"])),
-  stringsAsFactors = FALSE
-)
-
-unadj_tbl %>%
-  gt() %>%
-  cols_label(
-    HR_CI = "HR (95% CI)",
-    P     = "P-value"
-  ) %>%
-  tab_header(
-    title    = "HR for 1st-line regimen",
-    subtitle = sprintf("N = %d", mod_unadj$n)
-  )
-
-
-# -- 1. Regimen 분포 -- #
-regimen_dist <- dat %>%
-  count(first_regimen, name = "N", .drop = FALSE) %>%
-  mutate(
-    Percent = sprintf("%.1f%%", N / sum(N) * 100)
-  )
-
-regimen_dist %>%
-  gt() %>%
-  tab_header(
-    title    = "1st-line regimen distribution"
-  )
-OUTPUT_DIR = "/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Lpl/Figure"
-# Bar chart
-png(file.path(OUTPUT_DIR, "regimen_distribution.png"),
-    height = 6, width = 8, units = "in", res = 300)
-ggplot(dat, aes(x = first_regimen, fill = first_regimen)) +
-  geom_bar(width = 0.7) +
-  geom_text(stat = "count", aes(label = after_stat(count)),
-            vjust = -0.4, size = 5) +
-  scale_fill_lancet() +
-  labs(title = "1st-line regimen distribution",
-       x = NULL, y = "N") +
-  theme_minimal(base_size = 14) +
-  theme(legend.position = "none",
-        plot.title = element_text(face = "bold"))
-dev.off()
-
-
-
-
-# -- 아래 것은 사용할 때 코드 확인하며 하기 -- #
-
-# -- Survival analysis -- #
-survival <- dat  %>% 
-  mutate(
-    groupA65 = 
-      case_when(
-        ScoreA65<=1 ~"Low",
-        ScoreA65<=5 ~ "Intermediate",
-        T ~ "High"),
-    groupA75 = 
-      case_when(
-        ScoreA75<=0 ~"Low",
-        ScoreA75<=5 ~ "Intermediate",
-        T ~ "High"),
-    groupD = 
-      case_when(
-        ScoreD<=1 ~"Low",
-        ScoreD<=4 ~ "Intermediate",
-        T ~ "High"),
-    groupE = 
-      case_when(
-        ScoreE<=0 ~"Low",
-        ScoreE<=5 ~ "Intermediate",
-        T ~ "High")
-  ) %>% 
-  mutate(groupA65 = factor(groupA65, levels=c("Low","Intermediate","High")),
-         groupA75 = factor(groupA75, levels=c("Low","Intermediate","High")),
-         groupD = factor(groupD, levels=c("Low","Intermediate","High")),
-         groupE = factor(groupE, levels=c("Low","Intermediate","High")))
-
-table(survival$first_regimen)
-
-
-# 변경 전: sapply로 character vector 반환 → sub()로 파싱 필요
-# 변경 후: data.frame으로 strata + value 반환 → join 가능
-
-
-plot_regimen <- function(dat, regimen_name, group_var = "groupA65"){
-  fmla <- as.formula(paste0("Surv(as.numeric(death_yr), death) ~ ", group_var))
-  fit  <- surv_fit(fmla, data = dat)
-
-  font_size <- 14
-  p <- ggsurvplot(fit, data = dat,
-                  surv.median.line = "hv",
-                  risk.table = TRUE,
-                  tables.col = "strata",
-                  tables.y.text = FALSE,
-                  conf.int = TRUE,
-                  xlim = c(0, 12),
-                  xlab = "Time (years)",
-                  ylab = "Survival Probability (%)",
-                  title = regimen_name,
-                  legend = "right",
-                  legend.title = group_var,
-                  tables.height = 0.25,
-                  break.time.by = 2,
-                  risk.table.fontsize = 4,
-                  palette = pal_lancet()(3)[c(1, 3, 2)],
-                  tables.theme = theme_cleantable())
-
-  p$plot <- p$plot +
-    scale_y_continuous(labels = function(x) x * 100) +
-    theme(
-      axis.title  = element_text(size = font_size),
-      axis.text   = element_text(size = font_size),
-      plot.title  = element_text(size = font_size + 2, face = "bold"),
-      legend.text = element_text(size = font_size - 2)
-    )
-  p
-}
-
-
-summary_regimen <- function(dat, regimen_name, group_var = "groupA65"){
-  fmla <- as.formula(paste0("Surv(as.numeric(death_yr), death) ~ ", group_var))
-  fit  <- surv_fit(fmla, data = dat)
-  cox  <- coxph(fmla, data = dat)
-  sc   <- summary(cox)
-
-  # reverse KM (median FU)
-  rev_dat <- dat
-  rev_dat$death <- 1 - rev_dat$death
-  sfit <- surv_fit(fmla, data = rev_dat)
-
-  # 통계 join — sub() 정규식 없이 strata 컬럼으로 깔끔하게 join
-  med <- format_median(fit)   |> dplyr::rename(median_os = value)
-  s5  <- format_surv(fit, 5)  |> dplyr::rename(y5        = value)
-  s10 <- format_surv(fit, 10) |> dplyr::rename(y10       = value)
-  fu  <- format_median(sfit)  |> dplyr::rename(median_fu = value)
-
-  surv_df <- med |>
-    dplyr::full_join(s5,  by = "strata") |>
-    dplyr::full_join(s10, by = "strata") |>
-    dplyr::full_join(fu,  by = "strata") |>
-    dplyr::mutate(Group = sub(paste0("^", group_var, "="), "", strata)) |>
-    dplyr::select(Group, median_os, y5, y10, median_fu)
-
-  # gt 1: 생존 통계
-  surv_gt <- surv_df |>
-    gt::gt() |>
-    gt::tab_header(title = regimen_name) |>
-    gt::cols_label(
-      median_os = "Median OS, yr (95% CI)",
-      y5        = "5-yr survival (95% CI)",
-      y10       = "10-yr survival (95% CI)",
-      median_fu = "Median FU, yr (95% CI)"
-    ) |>
-    gt::sub_missing(missing_text = "-")
-
-  # gt 2: Cox HR (reference 행 없이 깔끔하게)
-  hr_df <- data.frame(
-    group = rownames(sc$coefficients),
-    HR  = sprintf("%.2f (%.2f-%.2f)",
-                  sc$conf.int[,1], sc$conf.int[,3], sc$conf.int[,4]),
-    p   = ifelse(sc$coefficients[,5] < 0.001, "<.001",
-                 sprintf("%.3f", sc$coefficients[,5]))
-  )
-
-  hr_gt <- hr_df |>
-    gt::gt() |>
-    gt::tab_header(title = regimen_name)
-
-  list(surv = surv_gt, hr = hr_gt)
-}
-
-regimens <- survival %>% filter(!is.na(first_regimen)) %>%
-  pull(first_regimen) %>% unique() %>% sort()
-
-group_name <- c("Our_model_age65", "Our_model_age75", "Our_model_score_BSx_age65", "Our_model_score_BSx_age75")
-for (group_var in c("groupA65", "groupA75", "groupD", "groupE")) {
-  # 그림 (2x2 합쳐서 저장)
-  plot_list <- lapply(regimens, function(r){
-    plot_regimen(survival %>% filter(first_regimen == r), as.character(r), group_var = group_var)
-  })
-
-  OUTPUT_DIR="/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Lpl/Figure/"
-  dev.new()
-  png(paste0(OUTPUT_DIR, "survival_by_regimen_2x1_", group_name[which(c("groupA65", "groupA75", "groupD", "groupE") == group_var)], ".png"),
-      width = 16, height = 16, units = "in", res = 300)
-  arrange_ggsurvplots(plot_list, ncol = 2, nrow = 2, print = TRUE)
-  dev.off()
-}
-
-# 통계 테이블 (regimen별로 gt 두 개씩)
-for (group_var in c("groupA65", "groupA75", "groupD", "groupE")) {
-   cat(sprintf("\n=== Grouping by %s ===\n", group_var))
-   
-   for (r in regimens){
-     res <- summary_regimen(survival %>% filter(first_regimen == r), as.character(r), group_var = group_var)
-     cat(sprintf("\n--- Regimen: %s ---\n", r))
-     print(res$surv)
-     print(res$hr)
-   }
-} 
 
