@@ -43,8 +43,8 @@ library(timeROC)
 select <- dplyr::select
 
 # -- paths -- #
-DATA_PATH <- '/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Lpl/Data/WM final_260401.xlsx'
-OUTPUT_DIR <- '/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Lpl/Results'
+DATA_PATH <- '/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Data/WM final_260401.xlsx'
+OUTPUT_DIR <- '/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Results'
 
 # -- functions -- #
 source('/Users/chaehyun/Documents/GitHub/MM_registry/Function_Lpl.r')
@@ -298,13 +298,45 @@ score_list <- list(
 )
 
 # median FU에서 time-dependent ROC
-roc_res <- plot_timeROC_medianFU(score_list, list_name = "Scores")
+# roc_res <- plot_timeROC_medianFU(score_list, list_name = "Scores")
 
 # Integrated AUC (1-8년)
 compute_iAUC(score_list, list_name = "Scores", iauc_times = 1:8)
 
 base_vars <- c("Score_RIPSS", "sex", "ECOG performance status < 2", "B_Sx", "LNE", "HS", "ANC < 1000", "Hb11.5", "PLT100", "IgM7")
 multi_step("None", dat, base_vars) 
+
+
+# -- Uni results (Cox PH) -- #
+uni_list <- lapply(base_vars, function(var){
+  model <- coxph(as.formula(paste("Surv(death_yr, death) ~", paste0("`", var, "`"))),
+                 data = dat)
+  s <- summary(model)
+  coefs <- as.data.frame(s$coefficients)
+  ci <- as.data.frame(s$conf.int)
+  
+  data.frame(
+    term = rownames(coefs),
+    uni_HR  = ci[["exp(coef)"]],
+    uni_LCL = ci[["lower .95"]],
+    uni_UCL = ci[["upper .95"]],
+    uni_p   = coefs[["Pr(>|z|)"]],
+    stringsAsFactors = F
+  )
+})
+
+uni_list %>%
+  bind_rows() %>%
+  mutate(
+    `HR (95% CI)` = sprintf("%.2f (%.2f-%.2f)", uni_HR, uni_LCL, uni_UCL),
+    `P-value` = ifelse(uni_p < 0.001, "<.001", sprintf("%.3f", uni_p))
+  ) %>%
+  select(Variable = term, `HR (95% CI)`, `P-value`) %>%
+  gt() %>%
+  tab_header(title = "Univariable Cox PH results (outcome = death)")
+
+
+
 
 dat <- dat %>% 
   mutate(
@@ -316,6 +348,7 @@ dat <- dat %>%
                 `ANC < 1000` == 0 ~ 0, 
                 TRUE ~ NA_real_)
 )
+
 # 3) IPSS 인자 + RIPSS 인자 모델
 model_list3 <- list(
   "IPSS score"        = c("Score_IPSS"),
@@ -324,16 +357,213 @@ model_list3 <- list(
   "RIPSS-augmented score"        = c("Score_RIPSS_Others")
 )
 
-plot_timeROC_medianFU(model_list3, list_name = "Scores with RIPSS-augmented")
+# plot_timeROC_medianFU(model_list3, list_name = "Scores with RIPSS-augmented")
 
 compute_iAUC(model_list3, list_name = "Scores with RIPSS-augmented", iauc_times = 1:8)
 
 # -- Score별 event rate table -- #
+score_summary_table(dat, "Score_IPSS", "death")
+score_summary_table(dat, "Score_RIPSS", "death")
 score_summary_table(dat, "Score_RIPSS_Others", "death")
 
+# -- Supplementary Table: model list1 ~ model list3 model results -- #
+model_list1 <- list(
+  "age65 + B2MG3"        = c("age65", "Hb11.5", "PLT100", "B2MG_cat", "IgM7", "LDH250", "ALB3.5"),
+  "age65 + B2MG4"           = c("age65", "Hb11.5", "PLT100", "B2MG4",    "IgM7", "LDH250", "ALB3.5"),
+  "age75 + B2MG3"        = c("age75", "Hb11.5", "PLT100", "B2MG_cat", "IgM7", "LDH250", "ALB3.5"),
+  "age75 + B2MG4"           = c("age75", "Hb11.5", "PLT100", "B2MG4",    "IgM7", "LDH250", "ALB3.5"))
+
+model_list2 <- list(
+  "age65 + B2MG3 + B_Sx" = c("age65", "Hb11.5", "PLT100", "B2MG_cat", "IgM7", "LDH250", "ALB3.5", "B_Sx"),
+  "age65 + B2MG4 + B_Sx"    = c("age65", "Hb11.5", "PLT100", "B2MG4",    "IgM7", "LDH250", "ALB3.5", "B_Sx"),
+  "age75 + B2MG3 + B_Sx" = c("age75", "Hb11.5", "PLT100", "B2MG_cat", "IgM7", "LDH250", "ALB3.5", "B_Sx"),
+  "age75 + B2MG4 + B_Sx"    = c("age75", "Hb11.5", "PLT100", "B2MG4",    "IgM7", "LDH250", "ALB3.5", "B_Sx")
+)
+
+model_list3 <- list(
+  "age65 + B2MG3 + others"        = c("sex", "ECOG performance status < 2", "B_Sx", "LNE", "HS", "ANC < 1000", "age65", "Hb11.5", "PLT100", "B2MG_cat", "IgM7", "LDH250", "ALB3.5"),
+  "age65 + B2MG4 + others"           = c("sex", "ECOG performance status < 2", "B_Sx", "LNE", "HS", "ANC < 1000", "age65", "Hb11.5", "PLT100", "B2MG4",    "IgM7", "LDH250", "ALB3.5"),
+  "age75 + B2MG3 + others"        = c("sex", "ECOG performance status < 2", "B_Sx", "LNE", "HS", "ANC < 1000", "age75", "Hb11.5", "PLT100", "B2MG_cat", "IgM7", "LDH250", "ALB3.5"),
+  "age75 + B2MG4 + others"           = c("sex", "ECOG performance status < 2", "B_Sx", "LNE", "HS", "ANC < 1000", "age75", "Hb11.5", "PLT100", "B2MG4",    "IgM7", "LDH250", "ALB3.5")
+)
 
 
-# survival curve 그리기 by score group
-# Supplementary: model list1 ~ model list3 model results
-# Supplementary: model list1 ~ model list3 survival curve (step-wise selection 된 걸로)
-# Supplementary: Results 폴더 보면서 추가하기.
+
+
+for (i in seq_along(model_list1)) {
+   multi_step("None", dat, model_list1[[i]])
+}
+for (i in seq_along(model_list2)) {
+  multi_step("None", dat, model_list2[[i]])
+}
+for (i in seq_along(model_list3)) {
+  multi_step("None", dat, model_list3[[i]])
+}
+
+
+# -- Supplementary: model list1 ~ model list3 roc curve (step-wise selection 된 걸로) -- #
+
+model_list1 <- list(
+  IPSS  = "Score_IPSS",
+  RIPSS = "Score_RIPSS",
+  "age65 + B2MG3"        = c("ALB3.5"),
+  "age65 + B2MG4"           = c("ALB3.5"),
+  "age75 + B2MG3"        = c("ALB3.5"),
+  "age75 + B2MG4"           = c("ALB3.5"))
+
+model_list2 <- list(
+  IPSS  = "Score_IPSS",
+  RIPSS = "Score_RIPSS",
+  "age65 + B2MG3 + B_Sx" = c("ALB3.5", "B_Sx"),
+  "age65 + B2MG4 + B_Sx"    = c("ALB3.5", "B_Sx"),
+  "age75 + B2MG3 + B_Sx" = c("ALB3.5", "B_Sx"),
+  "age75 + B2MG4 + B_Sx"    = c("ALB3.5", "B_Sx")
+)
+
+
+model_list3 <- list(
+  IPSS  = "Score_IPSS",
+  RIPSS = "Score_RIPSS",
+  "age65 + B2MG3 + others"        = c("B_Sx", "ANC < 1000", "LDH250"),
+  "age65 + B2MG4 + others"           = c("B_Sx", "ANC < 1000", "LDH250"),
+  "age75 + B2MG3 + others"        = c("B_Sx", "ANC < 1000", "age75", "LDH250"),
+  "age75 + B2MG4 + others"           = c("B_Sx", "ANC < 1000", "age75", "LDH250")
+)
+
+# plot_timeROC_medianFU(model_list1)
+# plot_timeROC_medianFU(model_list2)
+# plot_timeROC_medianFU(model_list3)
+
+compute_iAUC(model_list1)
+compute_iAUC(model_list2)
+compute_iAUC(model_list3)
+
+
+
+# -- survival curve 그리기 by score group -- #
+survival <- dat  %>% 
+  mutate(
+    group_IPSS = 
+      case_when(
+        Score_IPSS >= 3                ~ "High",
+        Score_IPSS == 2                ~ "Intermediate",
+        Score_IPSS <= 1 & age65 == 1   ~ "Intermediate",
+        Score_IPSS <= 1 & age65 == 0   ~ "Low",
+        T ~ "High"),
+    group_RIPSS = 
+      case_when(
+        Score_RIPSS<=1 ~"Low",
+        Score_RIPSS<=2 ~ "Intermediate",
+        T ~ "High"),
+    group_RIPSS_Others = 
+      case_when(
+        Score_RIPSS_Others<=1 ~"Low",
+        Score_RIPSS_Others<=5 ~ "Intermediate",
+        T ~ "High")
+  ) %>% 
+  mutate(group_IPSS = factor(group_IPSS, levels=c("Low","Intermediate","High")),
+         group_RIPSS = factor(group_RIPSS, levels=c("Low","Intermediate","High")),
+         group_RIPSS_Others = factor(group_RIPSS_Others, levels=c("Low","Intermediate","High")) )
+
+fit1 <- survfit(Surv(death_yr, death) ~ group_IPSS, data = survival)
+fit2 <- survfit(Surv(death_yr, death) ~ group_RIPSS, data = survival)
+fit3 <- survfit(Surv(death_yr, death) ~ group_RIPSS_Others, data = survival)
+
+OUTPUT_DIR <- '/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Figure'
+
+# plot_survival_by_group(fit1, survival, OUTPUT_DIR, file_name = "/survival_by_group_IPSS.png", group_col = "group_IPSS")
+# plot_survival_by_group(fit2, survival, OUTPUT_DIR, file_name = "/survival_by_group_RIPSS.png", group_col = "group_RIPSS")
+# plot_survival_by_group(fit3, survival, OUTPUT_DIR, file_name = "/survival_by_group_RIPSS_Others.png", group_col = "group_RIPSS_Others")
+
+km_summary_by_group(survival, "group_IPSS", "death_yr", "death")
+km_summary_by_group(survival, "group_RIPSS", "death_yr", "death")
+km_summary_by_group(survival, "group_RIPSS_Others", "death_yr", "death")
+cox_hr_by_group(survival, "group_IPSS", "death_yr", "death")
+cox_hr_by_group(survival, "group_RIPSS", "death_yr", "death")
+cox_hr_by_group(survival, "group_RIPSS_Others", "death_yr", "death")
+
+# -- time-dependent ROC -- #
+model_sets <- list(
+  "IPSS score"        = c("Score_IPSS"),
+  "RIPSS score"        = c("Score_RIPSS"),
+  "RIPSS-augmented score"        = c("Score_RIPSS_Others")
+)
+
+OUTPUT_DIR <- '/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Figure/RIPSS-augmented ROC'
+# plot_timeROC_overlay(model_sets, AUC_TIMES = c(2,4,6,8), PLOT_TIMES = c(2,4,6,8), OUTPUT_DIR = OUTPUT_DIR)
+
+
+
+# -- Optimal cutoff (Youden index) -- #
+lancet_cols <- pal_lancet()(2)
+OUTPUT_DIR <- '/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Figure/'
+plot_score_histogram_with_cutoff(survival, "Score_IPSS", OUTPUT_DIR, lancet_cols)
+plot_score_histogram_with_cutoff(survival, "Score_RIPSS", OUTPUT_DIR, lancet_cols)
+plot_score_histogram_with_cutoff(survival, "Score_RIPSS_Others", OUTPUT_DIR, lancet_cols)
+
+# -- first-regimen 분포 -- #
+
+fit <- survfit(Surv(death_yr, death) ~ first_regimen, data = survival)
+OUTPUT_DIR="/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Figure/"
+plot_survival_by_group(fit, survival, OUTPUT_DIR, file_name = "/survival_by_1L_1.png", group_col = "first_regimen")
+
+km_summary_by_group(survival, "first_regimen", "death_yr", "death")
+cox_hr_by_group(survival, "first_regimen", "death_yr", "death")
+
+regimen_dist <- survival %>%
+  count(first_regimen, name = "N", .drop = FALSE) %>%
+  mutate(
+    Percent = sprintf("%.1f%%", N / sum(N) * 100)
+  )
+
+regimen_dist %>%
+  gt() 
+  
+# Bar chart
+# png(file.path(OUTPUT_DIR, "regimen_distribution.png"),
+#     height = 6, width = 8, units = "in", res = 300)
+# ggplot(survival, aes(x = first_regimen, fill = first_regimen)) +
+#   geom_bar(width = 0.7) +
+#   geom_text(stat = "count", aes(label = after_stat(count)),
+#             vjust = -0.4, size = 5) +
+#   scale_fill_lancet() +
+#   labs(title = "1st-line regimen distribution",
+#        x = NULL, y = "N") +
+#   theme_minimal(base_size = 14) +
+#   theme(legend.position = "none",
+#         plot.title = element_text(face = "bold"))
+# dev.off()
+
+
+
+regimens <- survival %>% filter(!is.na(first_regimen)) %>%
+  pull(first_regimen) %>% unique() %>% sort()
+
+group_name <- c("IPSS group", "RIPSS group", "RIPSS-augmented group")
+for (group_var in c("group_IPSS", "group_RIPSS", "group_RIPSS_Others")) {
+   cat(sprintf("\n=== Grouping by %s ===\n", group_var))
+   
+  # 그림 (2x2 합쳐서 저장)
+  plot_list <- lapply(regimens, function(r){
+    plot_regimen(survival %>% filter(first_regimen == r), as.character(r), group_var = group_var)
+  })
+
+  OUTPUT_DIR="/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Figure/"
+  dev.new()
+  png(paste0(OUTPUT_DIR, "survival_by_regimen_2x1_", group_name[which(c("group_IPSS", "group_RIPSS", "group_RIPSS_Others") == group_var)], ".png"),
+      width = 16, height = 16, units = "in", res = 300)
+  arrange_ggsurvplots(plot_list, ncol = 2, nrow = 2, print = TRUE)
+  dev.off()
+}
+
+# 통계 테이블 (regimen별로 gt 두 개씩)
+for (group_var in c("group_IPSS", "group_RIPSS", "group_RIPSS_Others")) {
+   cat(sprintf("\n=== Grouping by %s ===\n", group_var))
+   
+   for (r in regimens){
+     res <- summary_regimen(survival %>% filter(first_regimen == r), as.character(r), group_var = group_var)
+     cat(sprintf("\n--- Regimen: %s ---\n", r))
+     print(res$surv)
+     print(res$hr)
+   }
+} 

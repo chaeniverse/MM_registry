@@ -157,7 +157,7 @@ plot_timeROC_medianFU <- function(model_list,
   }
 
   # ---- Plot ----
-  out_dir <- "/Users/chaehyun/Library/CloudStorage/Dropbox/PIPET_Hematology/MM/Lpl/Figure/[26-05-11] time-dependent ROC"
+  out_dir <- "/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Figure/[26-05-11] time-dependent ROC"
   png_path <- file.path(out_dir, sprintf("ROC_medianFU_%s.png", list_name))
 
   colors <- pal_lancet()(length(results))
@@ -258,3 +258,295 @@ score_summary_table <- function(data, score_var, outcome_var) {
   ) |> gt()
 }
 
+
+
+plot_timeROC_overlay <- function(model_sets, AUC_TIMES, PLOT_TIMES, OUTPUT_DIR) {
+
+  all_vars <- unique(unlist(model_sets))
+  dat_cc   <- dat[, c("death", "death_yr", all_vars)] %>% na.omit()
+  cat(sprintf("Common complete case N = %d\n", nrow(dat_cc)))
+
+  results <- list()
+
+  for (nm in names(model_sets)) {
+    vars <- model_sets[[nm]]
+    fml  <- as.formula(paste("Surv(death_yr, death) ~",
+                            paste0("`", vars, "`", collapse = " + ")))
+    mod  <- coxph(fml, data = dat_cc)
+    lp   <- predict(mod, type = "lp")
+    
+    tr <- timeROC(T         = dat_cc$death_yr,
+                  delta     = dat_cc$death,
+                  marker    = lp,
+                  cause     = 1,
+                  weighting = "marginal",
+                  times     = AUC_TIMES,
+                  iid       = TRUE)
+    
+    results[[nm]] <- list(model = mod, timeROC = tr, n = nrow(dat_cc))
+    cat(sprintf("  [%s] fitted (N=%d, p=%d)\n", nm, nrow(dat_cc), length(vars)))
+  }
+
+  colors <- pal_lancet()(length(results))
+
+  for (tp in PLOT_TIMES) {
+    png(file.path(OUTPUT_DIR, sprintf("ROC_overlay_%dyr.png", tp)),height = 8, width = 8, units = "in", res = 300)
+    par(pty = "s", mar = c(5, 5, 4, 2))
+
+    for (i in seq_along(results)) {
+      plot(results[[i]]$timeROC, time = tp,
+          col = colors[i], lwd = 3,
+          add = (i != 1), title = FALSE)
+    }
+    title(main = sprintf("Time-dependent ROC (%d-year OS)", tp),
+          cex.main = 1.3)
+
+    legend_labels <- sapply(seq_along(results), function(i) {
+      tr  <- results[[i]]$timeROC
+      idx <- which(tr$times == tp)
+      a   <- tr$AUC[idx]
+      se  <- tr$inference$vect_sd_1[idx]
+      sprintf("%s = %.3f (%.3f–%.3f)",
+              names(results)[i], a, a - 1.96*se, a + 1.96*se)
+    })
+    legend("bottomright", legend = legend_labels,
+          col = colors, lwd = 3, cex = 0.9, bty = "n")
+    dev.off()
+
+    cat(sprintf("  [%d-year] ROC plotted\n", tp))
+  }
+}
+
+plot_survival_by_group <- function(fit, survival, OUTPUT_DIR, file_name, group_col) {
+
+  png(paste0(OUTPUT_DIR, file_name), height = 10, width = 10, units = "in", res = 300)
+  font_size <- 16
+  p <- ggsurvplot(
+    fit, data           = survival,
+    surv.median.line    = "hv",
+    risk.table          = TRUE,
+    tables.col          = "strata",
+    tables.y.text       = FALSE,
+    conf.int            = FALSE,
+    xlim                = c(0, 12),
+    xlab                = "Time (years)",
+    ylab                = "Survival Probability (%)",
+    legend.title        = "RIPSS-augmented score group",
+    legend.labs         = levels(survival[[group_col]]),
+    tables.height       = 0.25,
+    break.time.by       = 1,
+    risk.table.fontsize = 5,
+    palette             = pal_lancet()(3)[c(1,3,2)],
+    tables.theme        = theme_cleantable()
+  )
+  p$plot <- p$plot +
+    scale_y_continuous(labels = function(x) x * 100) +
+    theme(axis.title  = element_text(size = font_size),
+          axis.text   = element_text(size = font_size),
+          legend.text = element_text(size = font_size - 2))
+  print(p)
+  dev.off()
+}
+
+# -- Survival probability at 5yr / 10yr --
+fmt_surv <- function(fit, tp) {
+  s <- summary(fit, times = tp, extend = TRUE)
+  data.frame(
+    strata = as.character(s$strata),
+    value  = sprintf("%.1f%% (%.1f–%.1f)",
+                    s$surv * 100, s$lower * 100, s$upper * 100),
+    stringsAsFactors = FALSE
+  )
+}
+
+km_summary_by_group <- function(data, group_col, time_col, event_col) {
+
+  fml <- as.formula(sprintf("Surv(%s, %s) ~ %s", time_col, event_col, group_col))
+  fit <- survfit(fml, data = data)
+
+  # -- Median OS --
+  med_surv <- as.data.frame(surv_median(fit)) %>%
+    mutate(`Median OS (95% CI)` =
+            sprintf("%.1f (%.1f–%.1f)", median, lower, upper)) %>%
+    select(strata, `Median OS (95% CI)`)
+
+  # -- Median follow-up (reverse KM) --
+  rev_dat <- data %>% mutate(death_rev = 1 - .data[[event_col]])
+  fml_rev <- as.formula(sprintf("Surv(%s, death_rev) ~ %s", time_col, group_col))
+  fit_rev <- survfit(fml_rev, data = rev_dat)
+  med_fu  <- as.data.frame(surv_median(fit_rev)) %>%
+    mutate(`Median FU (95% CI)` =
+            sprintf("%.1f (%.1f–%.1f)", median, lower, upper)) %>%
+    select(strata, `Median FU (95% CI)`)
+
+  surv_5yr  <- fmt_surv(fit, 5);  names(surv_5yr)[2]  <- "5yr OS (95% CI)"
+  surv_10yr <- fmt_surv(fit, 10); names(surv_10yr)[2] <- "10yr OS (95% CI)"
+
+  km_summary <- med_surv %>%
+    full_join(med_fu,    by = "strata") %>%
+    full_join(surv_5yr,  by = "strata") %>%
+    full_join(surv_10yr, by = "strata") %>%
+    mutate(Group = gsub(paste0(group_col, "="), "", strata, fixed = TRUE)) %>%
+    select(Group, `Median OS (95% CI)`, `Median FU (95% CI)`,
+          `5yr OS (95% CI)`, `10yr OS (95% CI)`)
+
+  km_summary %>%
+    gt() 
+}
+
+
+cox_hr_by_group <- function(data, group_col, time_col, event_col) {
+  fml <- as.formula(sprintf("Surv(%s, %s) ~ %s", time_col, event_col, group_col))
+  mod_unadj <- coxph(fml, data = data)
+  s_unadj   <- summary(mod_unadj)
+
+  unadj_tbl <- data.frame(
+    Group = gsub(paste0("^`?", group_col, "`?"), "", rownames(s_unadj$conf.int)),
+    HR_CI = sprintf("%.2f (%.2f–%.2f)",
+                    s_unadj$conf.int[, "exp(coef)"],
+                    s_unadj$conf.int[, "lower .95"],
+                    s_unadj$conf.int[, "upper .95"]),
+    P     = ifelse(s_unadj$coefficients[, "Pr(>|z|)"] < 0.001, "<.001",
+                  sprintf("%.3f", s_unadj$coefficients[, "Pr(>|z|)"])),
+    stringsAsFactors = FALSE
+  )
+
+  unadj_tbl %>%
+    gt() %>%
+    tab_header(
+      title    = "",
+      subtitle = sprintf("N = %d/%d", mod_unadj$n, nrow(data))
+    )
+
+
+}
+
+# ---- Survival curve by 1L_1 ---- #
+format_median <- function(fit){
+  m <- surv_median(fit)
+  data.frame(
+    strata = as.character(m[[1]]),
+    value  = sprintf("%.1f (%.1f-%.1f)", m[, 2], m[, 3], m[, 4]),
+    stringsAsFactors = FALSE
+  )
+}
+
+
+plot_regimen <- function(dat, regimen_name, group_var = "group_RIPSS_Others") {
+  fmla <- as.formula(paste0("Surv(as.numeric(death_yr), death) ~ ", group_var))
+  fit  <- surv_fit(fmla, data = dat)
+
+  font_size <- 14
+  p <- ggsurvplot(fit, data = dat,
+                  surv.median.line = "hv",
+                  risk.table = TRUE,
+                  tables.col = "strata",
+                  tables.y.text = FALSE,
+                  conf.int = TRUE,
+                  xlim = c(0, 12),
+                  xlab = "Time (years)",
+                  ylab = "Survival Probability (%)",
+                  title = regimen_name,
+                  legend = "right",
+                  legend.title = group_var,
+                  tables.height = 0.25,
+                  break.time.by = 2,
+                  risk.table.fontsize = 4,
+                  palette = pal_lancet()(3)[c(1, 3, 2)],
+                  tables.theme = theme_cleantable())
+
+  p$plot <- p$plot +
+    scale_y_continuous(labels = function(x) x * 100) +
+    theme(
+      axis.title  = element_text(size = font_size),
+      axis.text   = element_text(size = font_size),
+      plot.title  = element_text(size = font_size + 2, face = "bold"),
+      legend.text = element_text(size = font_size - 2)
+    )
+  p
+}
+
+
+summary_regimen <- function(dat, regimen_name, group_var = "group_RIPSS_Others"){
+  fmla <- as.formula(paste0("Surv(as.numeric(death_yr), death) ~ ", group_var))
+  fit  <- surv_fit(fmla, data = dat)
+  cox  <- coxph(fmla, data = dat)
+  sc   <- summary(cox)
+
+  # reverse KM (median FU)
+  rev_dat <- dat
+  rev_dat$death <- 1 - rev_dat$death
+  sfit <- surv_fit(fmla, data = rev_dat)
+
+  # 통계 join — sub() 정규식 없이 strata 컬럼으로 깔끔하게 join
+  med <- format_median(fit)   |> dplyr::rename(median_os = value)
+  s5  <- fmt_surv(fit, 5)  |> dplyr::rename(y5        = value)
+  s10 <- fmt_surv(fit, 10) |> dplyr::rename(y10       = value)
+  fu  <- format_median(sfit)  |> dplyr::rename(median_fu = value)
+
+  surv_df <- med |>
+    dplyr::full_join(s5,  by = "strata") |>
+    dplyr::full_join(s10, by = "strata") |>
+    dplyr::full_join(fu,  by = "strata") |>
+    dplyr::mutate(Group = sub(paste0("^", group_var, "="), "", strata)) |>
+    dplyr::select(Group, median_os, y5, y10, median_fu)
+
+  # gt 1: 생존 통계
+  surv_gt <- surv_df |>
+    gt::gt() |>
+    gt::tab_header(title = regimen_name) |>
+    gt::sub_missing(missing_text = "-")
+
+  # gt 2: Cox HR (reference 행 없이 깔끔하게)
+  hr_df <- data.frame(
+    group = rownames(sc$coefficients),
+    HR  = sprintf("%.2f (%.2f-%.2f)",
+                  sc$conf.int[,1], sc$conf.int[,3], sc$conf.int[,4]),
+    p   = ifelse(sc$coefficients[,5] < 0.001, "<.001",
+                 sprintf("%.3f", sc$coefficients[,5]))
+  )
+
+  hr_gt <- hr_df |>
+    gt::gt() |>
+    gt::tab_header(title = regimen_name)
+
+  list(surv = surv_gt, hr = hr_gt)
+}
+
+
+
+plot_score_histogram_with_cutoff <- function(survival, score_var, OUTPUT_DIR, lancet_cols) {
+
+  roc2 <- roc(survival[["death"]], survival[[score_var]])
+  coords_best <- coords(roc2, "best", best.method = "youden", ret = c("threshold", "sensitivity", "specificity"))
+  print(coords_best)
+
+  # -- Histogram -- #
+  survival$outcome <- factor(survival$death, levels = c(0, 1),
+                                labels = c("Alive", "Dead"))
+
+  mu <- survival %>%
+    group_by(outcome) %>%
+    summarise(grp.mean = mean(survival[[score_var]], na.rm = TRUE))
+
+  p <- ggplot(survival, aes(x = survival[[score_var]], fill = outcome, color = outcome)) +
+    geom_histogram(aes(y = after_stat(density)), binwidth = 1, alpha = 0.2, position = "identity") +
+    geom_vline(data = mu, aes(xintercept = grp.mean, color = outcome), linetype = "dashed") +
+    geom_vline(xintercept = coords_best$threshold, linetype = "dotted", color = "black", linewidth = 1) +
+    annotate("text", x = coords_best$threshold + 1, y = Inf, vjust = 2,
+            label = sprintf("Cutoff = %.1f", coords_best$threshold), size = 4) +
+    scale_fill_manual(values = lancet_cols, labels = c("Alive", "Dead")) +
+    scale_color_manual(values = lancet_cols, labels = c("Alive", "Dead")) +
+    theme(
+      panel.background = element_rect(fill = "white"),
+      panel.border = element_rect(fill = NA, colour = "black"),
+      axis.text = element_text(size = 12, colour = "black"),
+      axis.title = element_text(size = 14, colour = "black"),
+      legend.position = "bottom",
+      legend.title = element_text(face = "bold", size = 12),
+      legend.text = element_text(size = 11)
+    )
+
+  ggsave(paste0(OUTPUT_DIR, score_var, "_histogram.png"), plot = p, height = 10, width = 10, dpi = 300)
+
+}
