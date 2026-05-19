@@ -331,7 +331,7 @@ plot_survival_by_group <- function(fit, survival, OUTPUT_DIR, file_name, group_c
     xlim                = c(0, 12),
     xlab                = "Time (years)",
     ylab                = "Survival Probability (%)",
-    legend.title        = "RIPSS-augmented score group",
+    legend.title        = "",
     legend.labs         = levels(survival[[group_col]]),
     tables.height       = 0.25,
     break.time.by       = 1,

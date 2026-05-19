@@ -43,7 +43,7 @@ library(timeROC)
 select <- dplyr::select
 
 # -- paths -- #
-DATA_PATH <- '/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Data/WM final_260401.xlsx'
+DATA_PATH <- '/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Data/WM final_260517.xlsx'
 OUTPUT_DIR <- '/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Results'
 
 # -- functions -- #
@@ -70,11 +70,11 @@ theme_gtsummary_compact()
 crf <- read_excel(DATA_PATH, sheet = 'CRF') %>%
   rename(
     `1L_1` = `1L...9`,
-    IgM_1 = `IgM...24`,
-    IgM_2 = `IgM...25`,
-    B2MG_cont = `B2MG...40`,
-    B2MG_cat = `B2MG...41`,
-    `1L_2` = `1L...65`
+    IgM_1 = `IgM...26`,
+    IgM_2 = `IgM...27`,
+    B2MG_cont = `B2MG...42`,
+    B2MG_cat = `B2MG...43`,
+    `1L_2` = `1L...67`
   )
 # colnames(crf)
 # str(crf)
@@ -92,7 +92,7 @@ crf <- crf %>%
   select(c("TLT12", "1L_1", "1L_start", "age", "age65", "sex", "ECOG", "PS", "B_Sx", "LNE", 
   "HS", "spleen", "liver", "IgM7", "ANC", "Hb", "Hb10", "Hb11", "PLT", "PLT100", "LDH", "LDH2", 
   "ALB", "ALB3.5", "B2MG_cont", "B2MG_cat", "IPSS", "RIPSS", "MSS", "MYD88", "CXCR4", "sPEP",
-  "진단일","last_fu", "death")) %>%
+  "진단일","last_fu", "death", "SUBG_BR_OTHER", "ASCT")) %>%
   mutate(
     age = as.numeric(age),
     ANC = as.numeric(ANC),
@@ -224,7 +224,7 @@ crf %>%
     missing_text = "Missing",
     missing_stat = "{N_miss} ({p_miss})"
   ) %>%
-  add_overall() %>%
+  # add_overall() %>%
   bold_labels() %>%
   modify_header(label = "**Characteristic**") %>%
   modify_caption("**Table. Baseline Characteristics (N = {N})**") %>%
@@ -240,7 +240,7 @@ dat <- crf %>%
     "LNE", "HS", "IgM7", "ANC < 1000", "PLT100", "LDH250",
     "ALB3.5", "B2MG_cat", "B2MG4", "Hb11.5", "MYD88", "CXCR4", 
     "IPSS", "RIPSS", "MSS", 
-    "진단일","last_fu", "death","death_day","death_yr")) %>%
+    "진단일","last_fu", "death","death_day","death_yr", "SUBG_BR_OTHER", "ASCT")) %>%
   mutate(
     sex=factor(sex,levels=c("M","F")),
     `ECOG performance status < 2`=factor(`ECOG performance status < 2`,levels=c(0,1)),
@@ -256,7 +256,8 @@ dat <- crf %>%
     B_Sx=factor(B_Sx,levels=c(0,1)),
     `ANC < 1000` = factor(`ANC < 1000`, levels = c(0, 1))
   )     
-# View(dat)
+table(dat$SUBG_BR_OTHER)
+table(dat$ASCT)
 
 # -- Score 계산 -- # 
 dat <- dat %>% rename(first_regimen = `1L_1`) %>%
