@@ -209,7 +209,55 @@ fit1 <- survfit(Surv(death_yr, death) ~ ASCT, data = survival)
 
 OUTPUT_DIR <- '/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Figure'
 
-plot_survival_by_group(fit1, survival, OUTPUT_DIR, file_name = "/survival_by_group_ASCT.png", group_col = "ASCT")
+# plot_survival_by_group(fit1, survival, OUTPUT_DIR, file_name = "/survival_by_group_ASCT.png", group_col = "ASCT")
+
+km_summary_by_group(survival, "ASCT", "death_yr", "death")
+cox_hr_by_group(survival, "ASCT", "death_yr", "death")
+
+
+
+# 혹시 모르니 아래 코드 확인하면서 진행하기
+####! Matching ---------------------------------------------------------------
+dat_complete <- dat %>% filter(!is.na(ASCT), !is.na(RIPSS))
+
+theme_gtsummary_compact()
+dat_complete %>% 
+  select(ASCT, RIPSS) %>%
+  tbl_summary(ASCT,
+            statistic = list(all_continuous() ~ "{mean} ({sd})",
+                             all_categorical() ~ "{n} ({p}%)")) %>%
+  add_p() |>
+  gtsummary::as_gt() |>
+  tab_header(
+    title = sprintf("Unmatched cohort (N = %d/%d)", nrow(dat_complete), nrow(dat))
+  )
+
+
+psm = matchit(ASCT~ RIPSS,
+                data=dat_complete, method = "nearest", distance = "logit", replace = FALSE, caliper = 0.2, ratio =3)
+
+bal.tab(psm, m.threshold = 0.1, v.threshold = 2, un = TRUE) |> gt()
+
+matched_data = match.data(psm)
+
+matched_data %>% 
+  select(ASCT, RIPSS) %>%
+  tbl_summary(ASCT,
+            statistic = list(all_continuous() ~ "{mean} ({sd})",
+                             all_categorical() ~ "{n} ({p}%)")) %>%
+  add_p() |>
+  gtsummary::as_gt() |>
+  tab_header(
+    title = sprintf("Matched cohort")
+  )
+
+survival <- matched_data %>% filter(death_yr >= 0.5)
+table(survival$ASCT)
+fit1 <- survfit(Surv(death_yr, death) ~ ASCT, data = survival)
+
+OUTPUT_DIR <- '/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Figure'
+
+plot_survival_by_group(fit1, survival, OUTPUT_DIR, file_name = "/matched_survival_by_group_ASCT.png", group_col = "ASCT")
 
 km_summary_by_group(survival, "ASCT", "death_yr", "death")
 cox_hr_by_group(survival, "ASCT", "death_yr", "death")
