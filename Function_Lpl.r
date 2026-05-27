@@ -39,6 +39,7 @@ library(ggsci)
 library(dplyr)
 library(survAUC)
 library(timeROC)
+library(boot)
 
 select <- dplyr::select
 
@@ -183,49 +184,6 @@ plot_timeROC_medianFU <- function(model_list,
 }
 
 
-compute_iAUC <- function(model_list,
-                         list_name  = deparse(substitute(model_list)),
-                         iauc_times = 1:8) {
-
-  all_vars <- unique(unlist(model_list))
-  dat_cc   <- dat[, c("death", "death_yr", all_vars)] %>% na.omit()
-
-  cat(sprintf("\n========== [%s] Integrated AUC (times %d-%d yr) ==========\n",
-              list_name, min(iauc_times), max(iauc_times)))
-  cat(sprintf("N = %d\n\n", nrow(dat_cc)))
-
-  # marginal OS 확률 (모델 무관, 한 번만 계산)
-  temp_surv_prop <- summary(
-    survfit(Surv(death_yr, death) ~ 1, data = dat_cc),
-    times = iauc_times, extend = TRUE
-  )$surv
-
-  for (nm in names(model_list)) {
-    vars <- model_list[[nm]]
-    fml  <- as.formula(paste("Surv(death_yr, death) ~",
-                             paste0("`", vars, "`", collapse = " + ")))
-    mod  <- coxph(fml, data = dat_cc)
-    lp   <- predict(mod, type = "lp")
-
-    tr <- timeROC(T = dat_cc$death_yr, delta = dat_cc$death,
-                  marker = lp, cause = 1, weighting = "marginal",
-                  times = iauc_times, iid = TRUE)
-
-    iauc <- IntAUC(tr$AUC, iauc_times, temp_surv_prop,
-                   tmax = max(iauc_times))
-    cat(sprintf("  [%-30s] iAUC = %.3f\n", nm, iauc))
-  }
-}
-
-
-# ---- 호출 ----
-# plot_timeROC_medianFU(model_list1)
-# plot_timeROC_medianFU(model_list2)
-# plot_timeROC_medianFU(model_list3)
-
-# compute_iAUC(model_list1)
-# compute_iAUC(model_list2)
-# compute_iAUC(model_list3)
 
 # -- Score별 요약 테이블 -- #
 score_summary_table <- function(data, score_var, outcome_var) {
@@ -317,7 +275,7 @@ plot_timeROC_overlay <- function(model_sets, AUC_TIMES, PLOT_TIMES, OUTPUT_DIR) 
   }
 }
 
-plot_survival_by_group <- function(fit, survival, OUTPUT_DIR, file_name, group_col) {
+plot_survival_by_group <- function(fit, survival, OUTPUT_DIR, file_name, group_col, palette = pal_lancet()(3)[c(1, 3, 2)]) {
 
   png(paste0(OUTPUT_DIR, file_name), height = 10, width = 10, units = "in", res = 300)
   font_size <- 16
@@ -336,7 +294,7 @@ plot_survival_by_group <- function(fit, survival, OUTPUT_DIR, file_name, group_c
     tables.height       = 0.25,
     break.time.by       = 1,
     risk.table.fontsize = 5,
-    palette             = pal_lancet()(3)[c(1,3,2)],
+    palette             = palette,
     tables.theme        = theme_cleantable()
   )
   p$plot <- p$plot +
@@ -549,4 +507,89 @@ plot_score_histogram_with_cutoff <- function(survival, score_var, OUTPUT_DIR, la
 
   ggsave(paste0(OUTPUT_DIR, score_var, "_histogram.png"), plot = p, height = 10, width = 10, dpi = 300)
 
+}
+plot_timeAUC_overlay <- function(model_sets, AUC_TIMES, OUTPUT_DIR,
+                                 xlab = "Time (years)",
+                                 file_name = "timeAUC_overlay.png",
+                                 data = dat,
+                                 ci_tbl = NULL) {
+
+  all_vars <- unique(unlist(model_sets))
+  dat_cc   <- data[, c("death", "death_yr", all_vars)] %>% na.omit()
+  cat(sprintf("Common complete case N = %d\n", nrow(dat_cc)))
+
+  # 공통 marginal 생존확률 (iAUC 적분용, 모델 무관)            # <<< 추가
+  sp <- summary(survfit(Surv(death_yr, death) ~ 1, data = dat_cc),
+                times = AUC_TIMES, extend = TRUE)$surv
+
+  results <- list()
+  for (nm in names(model_sets)) {
+    vars <- model_sets[[nm]]
+    fml  <- as.formula(paste("Surv(death_yr, death) ~",
+                             paste0("`", vars, "`", collapse = " + ")))
+    mod  <- coxph(fml, data = dat_cc)
+
+    tr <- timeROC(T         = dat_cc$death_yr,
+                  delta     = dat_cc$death,
+                  marker    = dat_cc[[ vars[1] ]],  # Cox LP 대신 첫 번째 변수로 AUC 계산 (모델 간 비교용)
+                  cause     = 1,
+                  weighting = "marginal",
+                  times     = AUC_TIMES,
+                  iid       = TRUE)
+
+    # ---- iAUC 계산 (곡선과 동일한 tr$AUC 사용, NA 안전) ----   # <<< 추가
+    ok   <- is.finite(tr$AUC)
+    iauc <- IntAUC(tr$AUC[ok], tr$times[ok], sp[ok], tmax = max(tr$times[ok]))
+
+    ci <- c(NA_real_, NA_real_)
+    if (!is.null(ci_tbl)){
+      row <- ci_tbl[ci_tbl$Score == nm, ]
+      if (nrow(row) == 1){
+        ci <- c(row$lower, row$upper)
+        iauc <- row$iAUC
+      }
+    }
+
+    results[[nm]] <- list(model = mod, timeROC = tr, n = nrow(dat_cc),
+                          iauc = iauc, ci = ci)
+    if (anyNA(ci))
+      cat(sprintf("  [%s] fitted (N=%d, p=%d) | iAUC = %.3f\n",
+                  nm, nrow(dat_cc), length(vars), iauc))
+    else
+      cat(sprintf("  [%s] fitted (N=%d, p=%d) | iAUC = %.3f (%.3f-%.3f)\n",
+                  nm, nrow(dat_cc), length(vars), iauc, ci[1], ci[2]))
+  }
+
+  colors <- pal_lancet()(length(results))
+
+  # ---- 단일 overlay 그림: AUC(t) vs time ----
+  png(file.path(OUTPUT_DIR, file_name), height = 8, width = 8, units = "in", res = 300)
+  par(pty = "s", mar = c(5, 5, 4, 2))
+
+  plot(NA, xlim = range(AUC_TIMES), ylim = c(0.1, 1),
+       xlab = xlab, ylab = "Time-dependent AUC",
+       cex.lab = 1.3, cex.axis = 1.1, las = 1)
+  abline(h = 0.5, lty = 2, col = "grey60")
+
+  for (i in seq_along(results)) {
+    tr <- results[[i]]$timeROC
+    lines(tr$times, tr$AUC, col = colors[i], lwd = 3, type = "o", pch = 16)
+  }
+  title(main = "Time-dependent AUC", cex.main = 1.3)
+
+  # 범례 = 모델명 + iAUC                                        # <<< 변경
+  legend_labels <- sapply(seq_along(results), function(i){
+    r <- results[[i]]
+    if (anyNA(r$ci))
+      sprintf("%s: %.3f", names(results)[i], r$iauc)
+    else
+      sprintf("%s: %.3f (%.3f-%.3f)", names(results)[i],
+              r$iauc, r$ci[1], r$ci[2])
+  })
+  legend("bottomright", legend = legend_labels,
+         col = colors, lwd = 3, cex = 0.9, bty = "n")
+  dev.off()
+
+  cat(sprintf("Plot saved: %s\n", file.path(OUTPUT_DIR, file_name)))
+  invisible(results)
 }
