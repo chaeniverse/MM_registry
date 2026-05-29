@@ -217,44 +217,39 @@ score_summary_table <- function(data, score_var, outcome_var) {
 }
 
 
-
-plot_timeROC_overlay <- function(model_sets, AUC_TIMES, PLOT_TIMES, OUTPUT_DIR) {
+plot_timeROC_overlay <- function(data, model_sets, AUC_TIMES, PLOT_TIMES, OUTPUT_DIR) {
 
   all_vars <- unique(unlist(model_sets))
-  dat_cc   <- dat[, c("death", "death_yr", all_vars)] %>% na.omit()
-  cat(sprintf("Common complete case N = %d\n", nrow(dat_cc)))
+  dat_cc   <- data[, c("death", "death_yr", all_vars)] %>% na.omit()
 
   results <- list()
 
   for (nm in names(model_sets)) {
-    vars <- model_sets[[nm]]
-    fml  <- as.formula(paste("Surv(death_yr, death) ~",
-                            paste0("`", vars, "`", collapse = " + ")))
-    mod  <- coxph(fml, data = dat_cc)
-    lp   <- predict(mod, type = "lp")
-    
+    vars   <- model_sets[[nm]]
+    marker <- dat_cc[[vars]]          # 스코어 값 자체를 marker로 사용
+
     tr <- timeROC(T         = dat_cc$death_yr,
                   delta     = dat_cc$death,
-                  marker    = lp,
+                  marker    = marker,
                   cause     = 1,
                   weighting = "marginal",
                   times     = AUC_TIMES,
                   iid       = TRUE)
-    
-    results[[nm]] <- list(model = mod, timeROC = tr, n = nrow(dat_cc))
-    cat(sprintf("  [%s] fitted (N=%d, p=%d)\n", nm, nrow(dat_cc), length(vars)))
+
+    results[[nm]] <- list(timeROC = tr, n = nrow(dat_cc))
   }
 
   colors <- pal_lancet()(length(results))
 
   for (tp in PLOT_TIMES) {
-    png(file.path(OUTPUT_DIR, sprintf("ROC_overlay_%dyr.png", tp)),height = 8, width = 8, units = "in", res = 300)
+    png(file.path(OUTPUT_DIR, sprintf("ROC_overlay_%dyr.png", tp)),
+        height = 8, width = 8, units = "in", res = 300)
     par(pty = "s", mar = c(5, 5, 4, 2))
 
     for (i in seq_along(results)) {
       plot(results[[i]]$timeROC, time = tp,
-          col = colors[i], lwd = 3,
-          add = (i != 1), title = FALSE)
+           col = colors[i], lwd = 3,
+           add = (i != 1), title = FALSE)
     }
     title(main = sprintf("Time-dependent ROC (%d-year OS)", tp),
           cex.main = 1.3)
@@ -268,7 +263,7 @@ plot_timeROC_overlay <- function(model_sets, AUC_TIMES, PLOT_TIMES, OUTPUT_DIR) 
               names(results)[i], a, a - 1.96*se, a + 1.96*se)
     })
     legend("bottomright", legend = legend_labels,
-          col = colors, lwd = 3, cex = 0.9, bty = "n")
+           col = colors, lwd = 3, cex = 0.9, bty = "n")
     dev.off()
 
     cat(sprintf("  [%d-year] ROC plotted\n", tp))
@@ -485,11 +480,11 @@ plot_score_histogram_with_cutoff <- function(survival, score_var, OUTPUT_DIR, la
 
   mu <- survival %>%
     group_by(outcome) %>%
-    summarise(grp.mean = mean(survival[[score_var]], na.rm = TRUE))
+    summarise(grp.mean = mean(.data[[score_var]], na.rm = TRUE))
 
-  p <- ggplot(survival, aes(x = survival[[score_var]], fill = outcome, color = outcome)) +
-    geom_histogram(aes(y = after_stat(density)), binwidth = 1, alpha = 0.2, position = "identity") +
-    geom_vline(data = mu, aes(xintercept = grp.mean, color = outcome), linetype = "dashed") +
+  p <- ggplot(survival, aes(x = .data[[score_var]], fill = outcome, color = outcome)) +
+    geom_histogram(aes(y = after_stat(density)), binwidth = 0.5, center = 0, alpha = 0.2, position = "identity") +
+    # geom_vline(data = mu, aes(xintercept = grp.mean, color = outcome), linetype = "dashed") +
     geom_vline(xintercept = coords_best$threshold, linetype = "dotted", color = "black", linewidth = 1) +
     annotate("text", x = coords_best$threshold + 1, y = Inf, vjust = 2,
             label = sprintf("Cutoff = %.1f", coords_best$threshold), size = 4) +
@@ -508,6 +503,7 @@ plot_score_histogram_with_cutoff <- function(survival, score_var, OUTPUT_DIR, la
   ggsave(paste0(OUTPUT_DIR, score_var, "_histogram.png"), plot = p, height = 10, width = 10, dpi = 300)
 
 }
+
 plot_timeAUC_overlay <- function(model_sets, AUC_TIMES, OUTPUT_DIR,
                                  xlab = "Time (years)",
                                  file_name = "timeAUC_overlay.png",
@@ -516,48 +512,31 @@ plot_timeAUC_overlay <- function(model_sets, AUC_TIMES, OUTPUT_DIR,
 
   all_vars <- unique(unlist(model_sets))
   dat_cc   <- data[, c("death", "death_yr", all_vars)] %>% na.omit()
-  cat(sprintf("Common complete case N = %d\n", nrow(dat_cc)))
-
-  # 공통 marginal 생존확률 (iAUC 적분용, 모델 무관)            # <<< 추가
-  sp <- summary(survfit(Surv(death_yr, death) ~ 1, data = dat_cc),
-                times = AUC_TIMES, extend = TRUE)$surv
 
   results <- list()
   for (nm in names(model_sets)) {
     vars <- model_sets[[nm]]
-    fml  <- as.formula(paste("Surv(death_yr, death) ~",
-                             paste0("`", vars, "`", collapse = " + ")))
-    mod  <- coxph(fml, data = dat_cc)
 
     tr <- timeROC(T         = dat_cc$death_yr,
                   delta     = dat_cc$death,
-                  marker    = dat_cc[[ vars[1] ]],  # Cox LP 대신 첫 번째 변수로 AUC 계산 (모델 간 비교용)
+                  marker    = dat_cc[[ vars[1] ]],     # 첫 변수(점수)로 AUC(t) 계산 — 의도대로 유지
                   cause     = 1,
                   weighting = "marginal",
-                  times     = AUC_TIMES,
-                  iid       = TRUE)
+                  times     = AUC_TIMES)
 
-    # ---- iAUC 계산 (곡선과 동일한 tr$AUC 사용, NA 안전) ----   # <<< 추가
-    ok   <- is.finite(tr$AUC)
-    iauc <- IntAUC(tr$AUC[ok], tr$times[ok], sp[ok], tmax = max(tr$times[ok]))
-
-    ci <- c(NA_real_, NA_real_)
-    if (!is.null(ci_tbl)){
+    # iAUC / CI 는 앞서 구한 ci_tbl 에서 가져옴
+    iauc <- NA_real_                                   # NULL -> NA_real_ (범례 안전)
+    ci   <- c(NA_real_, NA_real_)
+    if (!is.null(ci_tbl)) {
       row <- ci_tbl[ci_tbl$Score == nm, ]
-      if (nrow(row) == 1){
-        ci <- c(row$lower, row$upper)
+      if (nrow(row) == 1) {
+        ci   <- c(row$lower, row$upper)
         iauc <- row$iAUC
       }
     }
 
-    results[[nm]] <- list(model = mod, timeROC = tr, n = nrow(dat_cc),
-                          iauc = iauc, ci = ci)
-    if (anyNA(ci))
-      cat(sprintf("  [%s] fitted (N=%d, p=%d) | iAUC = %.3f\n",
-                  nm, nrow(dat_cc), length(vars), iauc))
-    else
-      cat(sprintf("  [%s] fitted (N=%d, p=%d) | iAUC = %.3f (%.3f-%.3f)\n",
-                  nm, nrow(dat_cc), length(vars), iauc, ci[1], ci[2]))
+    results[[nm]] <- list(timeROC = tr, vars = vars,
+                          n = nrow(dat_cc), iauc = iauc, ci = ci)
   }
 
   colors <- pal_lancet()(length(results))
@@ -577,14 +556,16 @@ plot_timeAUC_overlay <- function(model_sets, AUC_TIMES, OUTPUT_DIR,
   }
   title(main = "Time-dependent AUC", cex.main = 1.3)
 
-  # 범례 = 모델명 + iAUC                                        # <<< 변경
-  legend_labels <- sapply(seq_along(results), function(i){
-    r <- results[[i]]
-    if (anyNA(r$ci))
-      sprintf("%s: %.3f", names(results)[i], r$iauc)
+  # 범례 = 모델명 + iAUC(있으면) (+CI 있으면)
+  legend_labels <- sapply(seq_along(results), function(i) {
+    r  <- results[[i]]
+    nm <- names(results)[i]
+    if (is.null(r$iauc) || is.na(r$iauc))              # iAUC 없으면 이름만 (NULL 에러 방지)
+      nm
+    else if (anyNA(r$ci))
+      sprintf("%s: %.3f", nm, r$iauc)
     else
-      sprintf("%s: %.3f (%.3f-%.3f)", names(results)[i],
-              r$iauc, r$ci[1], r$ci[2])
+      sprintf("%s: %.3f (%.3f-%.3f)", nm, r$iauc, r$ci[1], r$ci[2])
   })
   legend("bottomright", legend = legend_labels,
          col = colors, lwd = 3, cex = 0.9, bty = "n")
