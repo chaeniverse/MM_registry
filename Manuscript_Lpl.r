@@ -264,39 +264,39 @@ dat <- crf %>%
 # -- Figure. Survival curve (Whole) -- #
 survival <- dat %>% filter(!is.na(death_yr))
 
-# OUTPUT_DIR <- '/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Figure/'
-# file_name <- "survival_whole.png"
+OUTPUT_DIR <- '/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Figure/'
+file_name <- "survival_whole.png"
 
-# fit <- survfit(Surv(death_yr, death) ~ 1, data = survival)
+fit <- survfit(Surv(death_yr, death) ~ 1, data = survival)
 
-# png(paste0(OUTPUT_DIR, file_name), width = 12, height = 10, units = "in", res = 300)
-# font_size <- 12
-# p <- ggsurvplot(
-#   fit, data           = survival,
-#   surv.median.line    = "hv",
-#   risk.table          = TRUE,
-#   # tables.col          = "strata",
-#   tables.y.text       = FALSE,
-#   conf.int            = FALSE,
-#   xlim                = c(0, 12),
-#   xlab                = "Time (years)",
-#   ylab                = "Survival Probability (%)",
-#   legend.title        = "",
-#   # legend.labs         = levels(survival[[group_col]]),
-#   tables.height       = 0.25,
-#   break.time.by       = 1,
-#   risk.table.fontsize = 5,
-#   palette             = pal_lancet()(3)[c(2)],
-#   tables.theme        = theme_cleantable()
-# )
-# p$plot <- p$plot +
-#   scale_y_continuous(labels = function(x) x * 100) +
-#   theme(axis.title.x  = element_text(size = font_size),
-#         axis.text.x = element_text(size = font_size),
-#         axis.title.y  = element_text(size = font_size),
-#         axis.text.y = element_text(size = font_size))
-# print(p)
-# dev.off()
+png(paste0(OUTPUT_DIR, file_name), width = 12, height = 10, units = "in", res = 300)
+font_size <- 12
+p <- ggsurvplot(
+  fit, data           = survival,
+  surv.median.line    = "hv",
+  risk.table          = TRUE,
+  # tables.col          = "strata",
+  tables.y.text       = FALSE,
+  conf.int            = FALSE,
+  xlim                = c(0, 10),
+  xlab                = "Time (years)",
+  ylab                = "Survival Probability (%)",
+  legend.title        = "",
+  # legend.labs         = levels(survival[[group_col]]),
+  tables.height       = 0.25,
+  break.time.by       = 1,
+  risk.table.fontsize = 5,
+  palette             = pal_lancet()(3)[c(2)],
+  tables.theme        = theme_cleantable()
+)
+p$plot <- p$plot +
+  scale_y_continuous(labels = function(x) x * 100) +
+  theme(axis.title.x  = element_text(size = font_size),
+        axis.text.x = element_text(size = font_size),
+        axis.title.y  = element_text(size = font_size),
+        axis.text.y = element_text(size = font_size))
+print(p)
+dev.off()
 
 
 
@@ -505,9 +505,9 @@ survival <- survival %>%
 )
 
 # -- Score별 event rate table -- #
-score_summary_table(survival, "Score_IPSS", "death")
-score_summary_table(survival, "Score_RIPSS", "death")
-score_summary_table(survival, "Score_RIPSS_augmented", "death")
+# score_summary_table(survival, "Score_IPSS", "death")
+# score_summary_table(survival, "Score_RIPSS", "death")
+# score_summary_table(survival, "Score_RIPSS_augmented", "death")
 
 # -- score groups -- #
 survival <- survival %>% 
@@ -545,70 +545,6 @@ survival <- survival %>%
          group_RIPSS_seg = factor(group_RIPSS_seg, levels=c("VL","Low","Intermediate","High","VH")),
          group_RIPSS_augmented = factor(group_RIPSS_augmented, levels=c("Low","Intermediate","High")) )
 
-# 비교
-compare <- copy(survival)
-compare <- compare %>%
-  mutate(
-    group_IPSS = case_when(
-      group_IPSS == "High" ~ "3_High",
-      group_IPSS == "Intermediate" ~ "2_Int",
-      group_IPSS == "Low" ~ "1_Low",
-      T ~ NA_character_),
-    group_RIPSS_seg = case_when(
-      group_RIPSS_seg == "VH" ~ "5_VH",
-      group_RIPSS_seg == "High" ~ "4_High",
-      group_RIPSS_seg == "Intermediate" ~ "3_Int",
-      group_RIPSS_seg == "Low" ~ "2_Low",
-      group_RIPSS_seg == "VL" ~ "1_VL",
-      T ~ NA_character_)
-  ) %>%
-  mutate(group_IPSS = factor(group_IPSS),
-         group_RIPSS_seg = factor(group_RIPSS_seg)) %>%
-  mutate(
-    IPSS = case_when(is.na(IPSS) ~ "NA",
-                      T ~ IPSS),
-    RIPSS = case_when(is.na(RIPSS) ~ "NA",
-                      T ~ RIPSS),
-    group_IPSS = case_when(is.na(group_IPSS) ~ "NA",
-                      T ~ group_IPSS),
-    group_RIPSS_seg = case_when(is.na(group_RIPSS_seg) ~ "NA",
-                      T ~ group_RIPSS_seg)
-  )
-compare$IPSS[compare$IPSS != compare$group_IPSS]
-compare$group_IPSS[compare$IPSS != compare$group_IPSS]
-
-compare$RIPSS[compare$RIPSS != compare$group_RIPSS_seg]
-compare$group_RIPSS_seg[compare$RIPSS != compare$group_RIPSS_seg]
-
-
-# IPSS 등급을 같은 표기로 맞추기 위한 매핑 (원본은 "1_Low" 형식, 재계산은 "Low" 형식)
-ipss_recode <- c("1_Low" = "Low", "2_Int" = "Intermediate", "3_High" = "High")
-
-check <- survival %>%
-  mutate(
-    IPSS_lab = ipss_recode[as.character(IPSS)],          # 원본을 재계산 표기로 변환
-    grp_lab  = as.character(group_IPSS),
-    # NA까지 고려한 일치 여부
-    same = (IPSS_lab == grp_lab) | (is.na(IPSS_lab) & is.na(grp_lab)),
-    same = ifelse(is.na(same), FALSE, same),
-    # 불일치 사유 분류
-    reason = case_when(
-      same                                   ~ "match",
-      is.na(IPSS_lab) & !is.na(grp_lab)      ~ "원본만 NA (재계산은 값 있음)",
-      !is.na(IPSS_lab) & is.na(grp_lab)      ~ "재계산만 NA (구성변수 결측)",
-      TRUE                                    ~ "둘 다 값 있는데 등급 다름"
-    )
-  )
-
-# 불일치 행만, 구성 변수와 함께 보기
-mismatch <- check %>%
-  filter(!same) %>%
-  select(No, IPSS, group_IPSS, reason,
-         Score_IPSS, age65, Hb11.5, PLT100, B2MG_cat, IgM7)
-
-print(mismatch, n = Inf)
-mismatch |> gt()
-
 
 # IPSS score group별 event rate table
 event_tab <- function(group){
@@ -622,25 +558,12 @@ event_tab <- function(group){
   )
   report %>%
     gt()}
-event_tab("group_IPSS");event_tab("group_RIPSS");event_tab("group_RIPSS_augmented")
+# event_tab("group_IPSS");event_tab("group_RIPSS");event_tab("group_RIPSS_augmented")
 
 # -- Score histogram with cutoff -- #
 lancet_cols <- pal_lancet()(2)
 OUTPUT_DIR <- '/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Figure/'
 plot_score_histogram_with_cutoff(survival, "Score_RIPSS_augmented", OUTPUT_DIR, lancet_cols)
-
-# -- Supplementary Table: model list3 model results -- #
-model_list3 <- list(
-  "age65 + B2MG3 + others"        = c("sex", "ECOG performance status < 2", "B_Sx", "LNE", "HS", "ANC < 1000", "age65", "Hb11.5", "PLT100", "B2MG_cat", "IgM7", "LDH250", "ALB3.5"),
-  "age65 + B2MG4 + others"           = c("sex", "ECOG performance status < 2", "B_Sx", "LNE", "HS", "ANC < 1000", "age65", "Hb11.5", "PLT100", "B2MG4",    "IgM7", "LDH250", "ALB3.5"),
-  "age75 + B2MG3 + others"        = c("sex", "ECOG performance status < 2", "B_Sx", "LNE", "HS", "ANC < 1000", "age75", "Hb11.5", "PLT100", "B2MG_cat", "IgM7", "LDH250", "ALB3.5"),
-  "age75 + B2MG4 + others"           = c("sex", "ECOG performance status < 2", "B_Sx", "LNE", "HS", "ANC < 1000", "age75", "Hb11.5", "PLT100", "B2MG4",    "IgM7", "LDH250", "ALB3.5")
-)
-
-for (i in seq_along(model_list3)) {
-  multi_step("None", dat, model_list3[[i]])
-}
-survival$group_RIPSS %>% table
 
 
 # -- Figure. time-dependent AUC 그리기 -- #
@@ -656,22 +579,24 @@ score_cols <- c(IPSS            = "Score_IPSS",
                 RIPSS           = "Score_RIPSS",
                 RIPSS_augmented = "Score_RIPSS_augmented")
 
-time_points <- 1:8
-# tmax_val    <- max(time_points)
-tmax_val    <- 2000
-
 calc_iauc <- function(d, marker_col, times = time_points, tmax = tmax_val) {
   out <- tryCatch({
     roc.dat <- timeROC(T = d$death_yr, delta = d$death,
                        marker = d[[marker_col]], cause = 1,
                        weighting = "marginal", times = times)
     auc <- roc.dat$AUC
-    temp <- summary(survfit(Surv(death_yr, death) ~ 1, data = d),
-                    times = times)$surv
+
+    stopifnot(length(auc) == length(times))   # ← 여기
+
+    # extend 없이, times 순서에 맞춰 NA로 채움
+    sf <- summary(survfit(Surv(death_yr, death) ~ 1, data = d), times = times)
+    temp <- rep(NA_real_, length(times))
+    temp[match(sf$time, times)] <- sf$surv
+
     ok <- is.finite(auc) & is.finite(temp)
-    if (sum(ok) < 2) return(NA_real_)   # 적분할 점이 2개 미만이면 NA 처리
+    if (sum(ok) < 2) return(NA_real_)
     IntAUC(auc[ok], times[ok], temp[ok], tmax)
-  }, error = function(e) NA_real_)       # 예기치 못한 에러도 NA로 흡수
+  }, error = function(e) NA_real_)
   out
 }
 
@@ -687,27 +612,18 @@ iauc_boot <- function(data, indices,
 }
 
 set.seed(1234)
+
+time_points <- 2:10
+tmax_val <- max(time_points)
+
 boot_res <- boot(dat_cc, statistic = iauc_boot, R = 1000)
 
 boot_dat <- as.data.frame(boot_res$t)
-
-d1 <- boot_dat[[2]] - boot_dat[[1]]   # RIPSS - IPSS
-d2 <- boot_dat[[3]] - boot_dat[[1]]   # RIPSS_aug - IPSS
-
-D     <- cbind(d1, d2)
-D     <- D[complete.cases(D), ]       # NA resample 제거
-d_bar <- colMeans(D)
-S     <- cov(D)
-
-# omnibus 통계량 (ANOVA의 F에 대응)과 p값
-T2 <- as.numeric(t(d_bar) %*% solve(S) %*% d_bar)
-p_omnibus <- pchisq(T2, df = ncol(D), lower.tail = FALSE)
-
-c(T2 = T2, p = p_omnibus)
-
-sum(boot_dat[3]<0.5)/1000
-sum(boot_dat[3]<boot_dat[1])/1000
-sum(boot_dat[3]<boot_dat[2])/1000
+ok <- complete.cases(boot_dat[, c(1,2,3)])
+n  <- sum(ok)
+sum(boot_dat[[3]][ok] < 0.5) / n
+sum(boot_dat[[3]][ok] < boot_dat[[1]][ok]) / n
+sum(boot_dat[[3]][ok] < boot_dat[[2]][ok]) / n
 
 tbl <- lapply(1:3, function(i) {
   ci <- boot.ci(boot_res, type = "perc", index = i)$percent[4:5]
@@ -721,13 +637,8 @@ tbl <- lapply(1:3, function(i) {
 
 OUTPUT_DIR <- "/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Figure"
 
-plot_timeAUC_overlay(model_sets, AUC_TIMES = 1:8,
+plot_timeAUC_overlay(model_sets, AUC_TIMES = 2:10,
                      OUTPUT_DIR = OUTPUT_DIR, file_name = "timeAUC_overlay.png", data = survival, ci_tbl = tbl)
-
-
-
-library(boot.pval)
-# boot.pval(boot_res, type = "perc", theta_null = 0, index = 6)   # 차이(index 6)의 p값
 
 
 # -- time-dependent AUC 그리기 (BR vs Other) -- #
@@ -739,16 +650,22 @@ Other_cc <- na.omit(Other_group[, c("death_yr", "death", unlist(model_sets))])
 
 set.seed(1234)
 boot_BR <- boot(BR_cc, statistic = iauc_boot, R = 1000)
+set.seed(1234)
 boot_Other <- boot(Other_cc, statistic = iauc_boot, R = 1000)
 boot_dat <- as.data.frame(boot_BR$t)
-sum(boot_dat[3]<0.5)/1000 # 0.001
-sum(boot_dat[3]<boot_dat[1])/1000 # 0.043
-sum(boot_dat[3]<boot_dat[2])/1000 # 0.194
+ok <- complete.cases(boot_dat[, c(1,2,3)])
+n  <- sum(ok)
+sum(boot_dat[[3]][ok] < 0.5) / n # 0.001
+sum(boot_dat[[3]][ok] < boot_dat[[1]][ok]) / n # 0.029
+sum(boot_dat[[3]][ok] < boot_dat[[2]][ok]) / n # 0.184
+
 
 boot_dat <- as.data.frame(boot_Other$t)
-sum(boot_dat[3]<0.5)/1000 # 0.054
-sum(boot_dat[3]<boot_dat[1])/1000 # 0.215
-sum(boot_dat[3]<boot_dat[2])/1000 # 0.104
+ok <- complete.cases(boot_dat[, c(1,2,3)])
+n  <- sum(ok)
+sum(boot_dat[[3]][ok] < 0.5) / n # 0.069
+sum(boot_dat[[3]][ok] < boot_dat[[1]][ok]) / n # 0.224
+sum(boot_dat[[3]][ok] < boot_dat[[2]][ok]) / n # 0.112
 
 tbl_BR <- lapply(1:3, function(i) {
   ci <- boot.ci(boot_BR, type = "perc", index = i)$percent[4:5]
@@ -770,9 +687,9 @@ tbl_Other <- lapply(1:3, function(i) {
   )
 }) %>% bind_rows() 
 
-plot_timeAUC_overlay(model_sets, AUC_TIMES = 1:8,
+plot_timeAUC_overlay(model_sets, AUC_TIMES = 2:10,
                      OUTPUT_DIR = OUTPUT_DIR, file_name = "timeAUC_overlay_BR.png", data = BR_group, ci_tbl = tbl_BR)
-plot_timeAUC_overlay(model_sets, AUC_TIMES = 1:8,
+plot_timeAUC_overlay(model_sets, AUC_TIMES = 2:10,
                      OUTPUT_DIR = OUTPUT_DIR, file_name = "timeAUC_overlay_Other.png", data = Other_group, ci_tbl = tbl_Other)
 
 # -- survival curve 그리기 by score group -- #
@@ -781,6 +698,18 @@ fit2 <- survfit(Surv(death_yr, death) ~ group_RIPSS, data = survival)
 fit3 <- survfit(Surv(death_yr, death) ~ group_RIPSS_augmented, data = survival)
 fit4 <- survfit(Surv(death_yr, death) ~ group_RIPSS_seg, data = survival)
 
+sd1 <- survdiff(Surv(death_yr, death) ~ group_IPSS,            data = survival)
+sd2 <- survdiff(Surv(death_yr, death) ~ group_RIPSS,           data = survival)
+sd3 <- survdiff(Surv(death_yr, death) ~ group_RIPSS_augmented, data = survival)
+sd4 <- survdiff(Surv(death_yr, death) ~ group_RIPSS_seg,       data = survival)
+
+sd_list <- list(IPSS = sd1, RIPSS = sd2, RIPSS_augmented = sd3, RIPSS_seg = sd4)
+
+logrank_p <- sapply(sd_list, function(s) {
+  ifelse(s$pvalue < .001, "<.001", sprintf("%.3f", s$pvalue))
+})
+logrank_p %>% as.data.frame() %>% gt
+
 OUTPUT_DIR <- '/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Figure'
 
 plot_survival_by_group(fit1, survival, OUTPUT_DIR, file_name = "/survival_by_group_IPSS.png", group_col = "group_IPSS")
@@ -788,16 +717,14 @@ plot_survival_by_group(fit2, survival, OUTPUT_DIR, file_name = "/survival_by_gro
 plot_survival_by_group(fit3, survival, OUTPUT_DIR, file_name = "/survival_by_group_RIPSS_augmented.png", group_col = "group_RIPSS_augmented")
 plot_survival_by_group(fit4, survival, OUTPUT_DIR, file_name = "/survival_by_group_RIPSS_seg.png", group_col = "group_RIPSS_seg", palette = pal_lancet()(5)[c(1, 3, 2, 4, 5)])
 
-
 # Survival results
 km_summary_by_group(survival, "group_IPSS", "death_yr", "death")
-km_summary_by_group(survival, "group_RIPSS", "death_yr", "death")
-km_summary_by_group(survival, "group_RIPSS_augmented", "death_yr", "death")
-km_summary_by_group(survival, "group_RIPSS_seg", "death_yr", "death")
-
 cox_hr_by_group(survival, "group_IPSS", "death_yr", "death")
+km_summary_by_group(survival, "group_RIPSS", "death_yr", "death")
 cox_hr_by_group(survival, "group_RIPSS", "death_yr", "death")
+km_summary_by_group(survival, "group_RIPSS_augmented", "death_yr", "death")
 cox_hr_by_group(survival, "group_RIPSS_augmented", "death_yr", "death")
+km_summary_by_group(survival, "group_RIPSS_seg", "death_yr", "death")
 cox_hr_by_group(survival, "group_RIPSS_seg", "death_yr", "death")
 
 vars <- c("IPSS"            = "group_IPSS",
@@ -805,7 +732,7 @@ vars <- c("IPSS"            = "group_IPSS",
           "RIPSS-augmented" = "group_RIPSS_augmented",
           "RIPSS seg" = "group_RIPSS_seg")
 
-tbl_other <- do.call(rbind, lapply(names(vars), function(sys) {
+tbl <- do.call(rbind, lapply(names(vars), function(sys) {
   t <- table(survival[[ vars[sys] ]])
   data.frame(System = sys,
              Group  = names(t),
@@ -813,7 +740,7 @@ tbl_other <- do.call(rbind, lapply(names(vars), function(sys) {
              row.names = NULL)
 }))
 
-tbl_other |>
+tbl |>
   gt(groupname_col = "System") |>
   cols_label(Group = "Risk group", N = "N") |>
   summary_rows(
@@ -830,18 +757,29 @@ fit1 <- survfit(Surv(death_yr, death) ~ group_IPSS, data = BR_group)
 fit2 <- survfit(Surv(death_yr, death) ~ group_RIPSS, data = BR_group)
 fit3 <- survfit(Surv(death_yr, death) ~ group_RIPSS_augmented, data = BR_group)
 
+sd1 <- survdiff(Surv(death_yr, death) ~ group_IPSS,            data = BR_group)
+sd2 <- survdiff(Surv(death_yr, death) ~ group_RIPSS,           data = BR_group)
+sd3 <- survdiff(Surv(death_yr, death) ~ group_RIPSS_augmented, data = BR_group)
+
+sd_list <- list(IPSS = sd1, RIPSS = sd2, RIPSS_augmented = sd3)
+
+logrank_p <- sapply(sd_list, function(s) {
+  ifelse(s$pvalue < .001, "<.001", sprintf("%.3f", s$pvalue))
+})
+logrank_p %>% as.data.frame() %>% gt
+
 plot_survival_by_group(fit1, BR_group, OUTPUT_DIR, file_name = "/survival_by_group_IPSS_BR.png", group_col = "group_IPSS")
 plot_survival_by_group(fit2, BR_group, OUTPUT_DIR, file_name = "/survival_by_group_RIPSS_BR.png", group_col = "group_RIPSS")
 plot_survival_by_group(fit3, BR_group, OUTPUT_DIR, file_name = "/survival_by_group_RIPSS_augmented_BR.png", group_col = "group_RIPSS_augmented")
 
 
 km_summary_by_group(BR_group, "group_IPSS", "death_yr", "death")
-km_summary_by_group(BR_group, "group_RIPSS", "death_yr", "death")
-km_summary_by_group(BR_group, "group_RIPSS_augmented", "death_yr", "death")
-
 cox_hr_by_group(BR_group, "group_IPSS", "death_yr", "death")
+km_summary_by_group(BR_group, "group_RIPSS", "death_yr", "death")
 cox_hr_by_group(BR_group, "group_RIPSS", "death_yr", "death")
+km_summary_by_group(BR_group, "group_RIPSS_augmented", "death_yr", "death")
 cox_hr_by_group(BR_group, "group_RIPSS_augmented", "death_yr", "death")
+
 
 
 
@@ -863,19 +801,30 @@ fit1 <- survfit(Surv(death_yr, death) ~ group_IPSS, data = Other_group)
 fit2 <- survfit(Surv(death_yr, death) ~ group_RIPSS, data = Other_group)
 fit3 <- survfit(Surv(death_yr, death) ~ group_RIPSS_augmented, data = Other_group)
 
+sd1 <- survdiff(Surv(death_yr, death) ~ group_IPSS,            data = Other_group)
+sd2 <- survdiff(Surv(death_yr, death) ~ group_RIPSS,           data = Other_group)
+sd3 <- survdiff(Surv(death_yr, death) ~ group_RIPSS_augmented, data = Other_group)
+
+sd_list <- list(IPSS = sd1, RIPSS = sd2, RIPSS_augmented = sd3)
+
+logrank_p <- sapply(sd_list, function(s) {
+  ifelse(s$pvalue < .001, "<.001", sprintf("%.3f", s$pvalue))
+})
+logrank_p %>% as.data.frame() %>% gt
+
 plot_survival_by_group(fit1, Other_group, OUTPUT_DIR, file_name = "/survival_by_group_IPSS_Other.png", group_col = "group_IPSS")
 plot_survival_by_group(fit2, Other_group, OUTPUT_DIR, file_name = "/survival_by_group_RIPSS_Other.png", group_col = "group_RIPSS")
 plot_survival_by_group(fit3, Other_group, OUTPUT_DIR, file_name = "/survival_by_group_RIPSS_augmented_Other.png", group_col = "group_RIPSS_augmented")
 
 km_summary_by_group(Other_group, "group_IPSS", "death_yr", "death")
-km_summary_by_group(Other_group, "group_RIPSS", "death_yr", "death")
-km_summary_by_group(Other_group, "group_RIPSS_augmented", "death_yr", "death")
-
 cox_hr_by_group(Other_group, "group_IPSS", "death_yr", "death")
+km_summary_by_group(Other_group, "group_RIPSS", "death_yr", "death")
 cox_hr_by_group(Other_group, "group_RIPSS", "death_yr", "death")
+km_summary_by_group(Other_group, "group_RIPSS_augmented", "death_yr", "death")
 cox_hr_by_group(Other_group, "group_RIPSS_augmented", "death_yr", "death")
 
-tbl_other <- do.call(rbind, lapply(names(vars), function(sys) {
+
+tbl <- do.call(rbind, lapply(names(vars), function(sys) {
   t <- table(Other_group[[ vars[sys] ]])
   data.frame(System = sys,
              Group  = names(t),
@@ -883,7 +832,7 @@ tbl_other <- do.call(rbind, lapply(names(vars), function(sys) {
              row.names = NULL)
 }))
 
-tbl_other |>
+tbl |>
   gt(groupname_col = "System") |>
   cols_label(Group = "Risk group", N = "N")
 
@@ -894,17 +843,40 @@ OUTPUT_DIR <- '/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_H
 fit <- survfit(Surv(death_yr, death) ~ SUBG_BR_OTHER, data = survival)
 plot_survival_by_group(fit, survival, OUTPUT_DIR, file_name = "/survival_by_group_BR_OTHER.png", group_col = "SUBG_BR_OTHER", palette = pal_lancet()(3)[c(1,2)])
 
+sd <- survdiff(Surv(death_yr, death) ~ SUBG_BR_OTHER, data = survival)
+print(ifelse(sd$pvalue < .001, "<.001", sprintf("%.3f", sd$pvalue)))
 
 # Survival results
 km_summary_by_group(survival, "SUBG_BR_OTHER", "death_yr", "death")
 cox_hr_by_group(survival, "SUBG_BR_OTHER", "death_yr", "death")
 
-survival[is.na(survival$SUBG_BR_OTHER),]$No
-
 
 
 # -- time-dependent ROC (2,4,6,8 years) -- #
 OUTPUT_DIR <- '/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Figure'
-plot_timeROC_overlay(data = survival, model_sets, AUC_TIMES = c(2,4,6,8), PLOT_TIMES = c(2,4,6,8), OUTPUT_DIR = OUTPUT_DIR)
+plot_timeROC_overlay(data = survival, model_sets, AUC_TIMES = c(2,4,6,8,10), PLOT_TIMES = c(2,4,6,8,10), OUTPUT_DIR = OUTPUT_DIR)
 
 
+# 공통 complete-case 데이터
+all_vars <- unique(unlist(model_sets))
+dat_cc   <- survival[, c("death", "death_yr", all_vars)] %>% na.omit()
+
+AUC_TIMES <- c(2, 4, 6, 8, 10)
+
+# 각 score의 timeROC (iid=TRUE 필수)
+tr_ipss <- timeROC(T = dat_cc$death_yr, delta = dat_cc$death,
+                   marker = dat_cc$Score_IPSS, cause = 1,
+                   weighting = "marginal", times = AUC_TIMES, iid = TRUE)
+
+tr_ripss <- timeROC(T = dat_cc$death_yr, delta = dat_cc$death,
+                    marker = dat_cc$Score_RIPSS, cause = 1,
+                    weighting = "marginal", times = AUC_TIMES, iid = TRUE)
+
+tr_aug <- timeROC(T = dat_cc$death_yr, delta = dat_cc$death,
+                  marker = dat_cc$Score_RIPSS_augmented, cause = 1,
+                  weighting = "marginal", times = AUC_TIMES, iid = TRUE)
+
+# 쌍대 비교 (각 시점별 p값 벡터를 반환)
+cmp_aug_vs_ripss <- compare(tr_aug, tr_ripss)   # augmented vs RIPSS
+
+cmp_aug_vs_ripss %>% as.data.frame() %>% round(3) %>% gt()
