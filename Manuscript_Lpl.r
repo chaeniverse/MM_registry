@@ -269,34 +269,34 @@ file_name <- "survival_whole.png"
 
 fit <- survfit(Surv(death_yr, death) ~ 1, data = survival)
 
-png(paste0(OUTPUT_DIR, file_name), width = 12, height = 10, units = "in", res = 300)
-font_size <- 12
-p <- ggsurvplot(
-  fit, data           = survival,
-  surv.median.line    = "hv",
-  risk.table          = TRUE,
-  # tables.col          = "strata",
-  tables.y.text       = FALSE,
-  conf.int            = FALSE,
-  xlim                = c(0, 10),
-  xlab                = "Time (years)",
-  ylab                = "Survival Probability (%)",
-  legend.title        = "",
-  # legend.labs         = levels(survival[[group_col]]),
-  tables.height       = 0.25,
-  break.time.by       = 1,
-  risk.table.fontsize = 5,
-  palette             = pal_lancet()(3)[c(2)],
-  tables.theme        = theme_cleantable()
-)
-p$plot <- p$plot +
-  scale_y_continuous(labels = function(x) x * 100) +
-  theme(axis.title.x  = element_text(size = font_size),
-        axis.text.x = element_text(size = font_size),
-        axis.title.y  = element_text(size = font_size),
-        axis.text.y = element_text(size = font_size))
-print(p)
-dev.off()
+# png(paste0(OUTPUT_DIR, file_name), width = 12, height = 10, units = "in", res = 300)
+# font_size <- 12
+# p <- ggsurvplot(
+#   fit, data           = survival,
+#   surv.median.line    = "hv",
+#   risk.table          = TRUE,
+#   # tables.col          = "strata",
+#   tables.y.text       = FALSE,
+#   conf.int            = FALSE,
+#   xlim                = c(0, 10),
+#   xlab                = "Time (years)",
+#   ylab                = "Survival Probability (%)",
+#   legend.title        = "",
+#   # legend.labs         = levels(survival[[group_col]]),
+#   tables.height       = 0.25,
+#   break.time.by       = 1,
+#   risk.table.fontsize = 5,
+#   palette             = pal_lancet()(3)[c(2)],
+#   tables.theme        = theme_cleantable()
+# )
+# p$plot <- p$plot +
+#   scale_y_continuous(labels = function(x) x * 100) +
+#   theme(axis.title.x  = element_text(size = font_size),
+#         axis.text.x = element_text(size = font_size),
+#         axis.title.y  = element_text(size = font_size),
+#         axis.text.y = element_text(size = font_size))
+# print(p)
+# dev.off()
 
 
 
@@ -563,10 +563,11 @@ event_tab <- function(group){
 # -- Score histogram with cutoff -- #
 lancet_cols <- pal_lancet()(2)
 OUTPUT_DIR <- '/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Figure/'
-plot_score_histogram_with_cutoff(survival, "Score_RIPSS_augmented", OUTPUT_DIR, lancet_cols)
+# plot_score_histogram_with_cutoff(survival, "Score_RIPSS_augmented", OUTPUT_DIR, lancet_cols)
 
 
 # -- Figure. time-dependent AUC 그리기 -- #
+
 model_sets <- list(
   "IPSS score"            = c("Score_IPSS"),
   "RIPSS score"           = c("Score_RIPSS"),
@@ -579,6 +580,12 @@ score_cols <- c(IPSS            = "Score_IPSS",
                 RIPSS           = "Score_RIPSS",
                 RIPSS_augmented = "Score_RIPSS_augmented")
 
+time_points <- c(2, 4, 6, 8, 10)
+# time_points <- 2:10
+# time_points <- 3:14
+tmax_val <- max(time_points)
+
+
 calc_iauc <- function(d, marker_col, times = time_points, tmax = tmax_val) {
   out <- tryCatch({
     roc.dat <- timeROC(T = d$death_yr, delta = d$death,
@@ -588,7 +595,6 @@ calc_iauc <- function(d, marker_col, times = time_points, tmax = tmax_val) {
 
     stopifnot(length(auc) == length(times))   # ← 여기
 
-    # extend 없이, times 순서에 맞춰 NA로 채움
     sf <- summary(survfit(Surv(death_yr, death) ~ 1, data = d), times = times)
     temp <- rep(NA_real_, length(times))
     temp[match(sf$time, times)] <- sf$surv
@@ -612,10 +618,6 @@ iauc_boot <- function(data, indices,
 }
 
 set.seed(1234)
-
-time_points <- 2:10
-tmax_val <- max(time_points)
-
 boot_res <- boot(dat_cc, statistic = iauc_boot, R = 1000)
 
 boot_dat <- as.data.frame(boot_res$t)
@@ -624,6 +626,7 @@ n  <- sum(ok)
 sum(boot_dat[[3]][ok] < 0.5) / n
 sum(boot_dat[[3]][ok] < boot_dat[[1]][ok]) / n
 sum(boot_dat[[3]][ok] < boot_dat[[2]][ok]) / n
+
 
 tbl <- lapply(1:3, function(i) {
   ci <- boot.ci(boot_res, type = "perc", index = i)$percent[4:5]
@@ -863,20 +866,44 @@ dat_cc   <- survival[, c("death", "death_yr", all_vars)] %>% na.omit()
 
 AUC_TIMES <- c(2, 4, 6, 8, 10)
 
-# 각 score의 timeROC (iid=TRUE 필수)
-tr_ipss <- timeROC(T = dat_cc$death_yr, delta = dat_cc$death,
-                   marker = dat_cc$Score_IPSS, cause = 1,
-                   weighting = "marginal", times = AUC_TIMES, iid = TRUE)
+auc_boot <- function(data, indices, times = AUC_TIMES) {
+  d <- data[indices, ]
+  tryCatch({
+    tr_ripss <- timeROC(T = d$death_yr, delta = d$death,
+                        marker = d$Score_RIPSS, cause = 1,
+                        weighting = "marginal", times = times)
+    tr_aug   <- timeROC(T = d$death_yr, delta = d$death,
+                        marker = d$Score_RIPSS_augmented, cause = 1,
+                        weighting = "marginal", times = times)
+    c(tr_ripss$AUC, tr_aug$AUC)
+  }, error = function(e) rep(NA_real_, 2 * length(times)))
+}
 
-tr_ripss <- timeROC(T = dat_cc$death_yr, delta = dat_cc$death,
-                    marker = dat_cc$Score_RIPSS, cause = 1,
-                    weighting = "marginal", times = AUC_TIMES, iid = TRUE)
+set.seed(1234)
+boot_auc <- boot(dat_cc, statistic = auc_boot, R = 1000)
+boot_dat <- as.data.frame(boot_auc$t)
+head(boot_dat)
 
-tr_aug <- timeROC(T = dat_cc$death_yr, delta = dat_cc$death,
-                  marker = dat_cc$Score_RIPSS_augmented, cause = 1,
-                  weighting = "marginal", times = AUC_TIMES, iid = TRUE)
+nt <- length(AUC_TIMES)
+colnames(boot_dat) <- c(paste0("RIPSS_t", AUC_TIMES),
+                        paste0("AUG_t",   AUC_TIMES))
 
-# 쌍대 비교 (각 시점별 p값 벡터를 반환)
-cmp_aug_vs_ripss <- compare(tr_aug, tr_ripss)   # augmented vs RIPSS
+# 시점별 단측검정
+#   H0: AUC_aug <= AUC_ripss   vs   H1: AUC_aug > AUC_ripss
+#   p = (augmented < RIPSS 인 복제 비율)
+res <- lapply(seq_len(nt), function(j) {
+  ripss <- boot_dat[[j]]          # RIPSS AUC  (j번째 시점)
+  aug   <- boot_dat[[j + nt]]     # augmented AUC
+  ok <- is.finite(ripss) & is.finite(aug)
+  pval <- sum(aug[ok] < ripss[ok]) / sum(ok)
+  data.frame(
+    time      = AUC_TIMES[j],
+    AUC_RIPSS = boot_auc$t0[j],          # 원본 데이터 점추정치
+    AUC_AUG   = boot_auc$t0[j + nt],
+    n_valid   = sum(ok),
+    p_value   = ifelse(pval < 0.001, "<.001", sprintf("%.3f", pval))
+  )
+})
+res <- do.call(rbind, res)
+res
 
-cmp_aug_vs_ripss %>% as.data.frame() %>% round(3) %>% gt()
