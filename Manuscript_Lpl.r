@@ -43,6 +43,7 @@ library(prodlim)
 library(tidycmprsk)
 library(ggsurvfit)
 library(boot)
+library(patchwork)
 select <- dplyr::select
 
 # -- paths -- #
@@ -264,40 +265,12 @@ dat <- crf %>%
 # -- Figure. Survival curve (Whole) -- #
 survival <- dat %>% filter(!is.na(death_yr))
 
-OUTPUT_DIR <- '/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Figure/'
-file_name <- "survival_whole.png"
+# OUTPUT_DIR <- '/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Figure/'
+# file_name <- "survival_whole.png"
 
 fit <- survfit(Surv(death_yr, death) ~ 1, data = survival)
-
-# png(paste0(OUTPUT_DIR, file_name), width = 12, height = 10, units = "in", res = 300)
-# font_size <- 12
-# p <- ggsurvplot(
-#   fit, data           = survival,
-#   surv.median.line    = "hv",
-#   risk.table          = TRUE,
-#   # tables.col          = "strata",
-#   tables.y.text       = FALSE,
-#   conf.int            = FALSE,
-#   xlim                = c(0, 10),
-#   xlab                = "Time (years)",
-#   ylab                = "Survival Probability (%)",
-#   legend.title        = "",
-#   # legend.labs         = levels(survival[[group_col]]),
-#   tables.height       = 0.25,
-#   break.time.by       = 1,
-#   risk.table.fontsize = 5,
-#   palette             = pal_lancet()(3)[c(2)],
-#   tables.theme        = theme_cleantable()
-# )
-# p$plot <- p$plot +
-#   scale_y_continuous(labels = function(x) x * 100) +
-#   theme(axis.title.x  = element_text(size = font_size),
-#         axis.text.x = element_text(size = font_size),
-#         axis.title.y  = element_text(size = font_size),
-#         axis.text.y = element_text(size = font_size))
-# print(p)
-# dev.off()
-
+summary(fit)$table
+# opt_plot(fit, OUTPUT_DIR, "survival_whole.png", deadline = 10, conf = F, ptitle = "up", col="")
 
 
 # -- Cumulative incidence (Whole) -- #
@@ -350,66 +323,20 @@ ci_tbl <- data.frame(
   Upper     = c(round(ub_6   * 100, 1), round(ub_3   * 100, 1))
 )
 
-ci_tbl |>
-  mutate(`CIF (%) (95% CI)` = sprintf("%.1f (%.1f–%.1f)", CIF, Lower, Upper)) |>
-  select(Timepoint, Time_yr, `CIF (%) (95% CI)`) |>
-  gt() |>
-  cols_label(
-    Timepoint = "Time point",
-    Time_yr   = "Time (yr)"
-  ) 
+# ci_tbl |>
+#   mutate(`CIF (%) (95% CI)` = sprintf("%.1f (%.1f–%.1f)", CIF, Lower, Upper)) |>
+#   select(Timepoint, Time_yr, `CIF (%) (95% CI)`) |>
+#   gt() |>
+#   cols_label(
+#     Timepoint = "Time point",
+#     Time_yr   = "Time (yr)"
+#   ) 
 
-# plot
-font_size <- 12
 
-common_theme <- theme(
-  axis.title = element_text(size = font_size),
-  axis.text  = element_text(size = font_size),
-  axis.line  = element_line(linewidth = 0.5),
-  axis.ticks = element_line(linewidth = 0.5),
-  panel.background = element_blank(),
-  panel.grid = element_blank(),
-  panel.border = element_blank(),
-  plot.margin = margin(5, 5, 5, 5),
-  legend.position = "none"
-)
-
-default_gray <- theme_gray()$line$colour
-
-# p <- tidycmprsk::cuminc(Surv(time_yr, status) ~ 1, data = data_now) |>
-#   ggcuminc(outcome = "1", linewidth = 1) +
-#   add_confidence_interval() +
-#   add_risktable(
-#     risktable_stats = "n.risk",                  # at risk 수만
-#     stats_label     = list(n.risk = "Number at risk"),
-#     risktable_group = "strata",
-#     times           = 0:6,  
-#     size            = 5,
-#     theme = theme_risktable_default(
-#       axis.text.y.size = 16,
-#       plot.title.size  = font_size
-#     )
-#   ) +  
-#   scale_y_continuous(breaks = seq(0, 1, 0.2), labels = function(x) x * 100, limits = c(0, 1)) +
-#   scale_x_continuous(breaks = 0:6, limits = c(0, 6), oob = scales::oob_keep) +
-#   labs(x = "Time (years)", y = "Cumulative Incidence (%)") +
-#   geom_vline(xintercept = 6,            linetype = "dashed",
-#              color = default_gray, linewidth = 0.5) +
-#   geom_vline(xintercept = 3, linetype = "dashed",
-#              color = default_gray, linewidth = 0.5) +
-#   theme_classic(base_size = font_size) +     
-#   common_theme                                
-
-# # --- layer 직접 수정으로 색 적용 ---
-# p$layers[[1]]$aes_params$colour <- pal_lancet()(3)[2]
-# p$layers[[2]]$aes_params$fill   <- pal_lancet()(3)[2]
-
-# # --- risk table 포함해 하나의 객체로 합친 뒤 저장 ---
-# p_built <- ggsurvfit_build(p)
-# ggsave(
-#   filename = paste0(OUTPUT_DIR, "cuminc_whole.png"),
-#   plot = p_built, width = 12, height = 10, units = "in", dpi = 300
-# )
+# plot (opt_cuminc: opt_plot 스타일 CIF, Function_Lpl.r 정의)
+# opt_cuminc(data_now, OUTPUT_DIR, "cuminc_whole.png",
+#            time_col = "time_yr", status_col = "status",
+#            outcome = "1", risk_times = 0:6, marker_times = c(3, 6))
 
 # -- Score 계산 -- # 
 survival <- survival %>% rename(first_regimen = `1L_1`) %>%
@@ -563,7 +490,7 @@ event_tab <- function(group){
 # -- Score histogram with cutoff -- #
 lancet_cols <- pal_lancet()(2)
 OUTPUT_DIR <- '/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Figure/'
-# plot_score_histogram_with_cutoff(survival, "Score_RIPSS_augmented", OUTPUT_DIR, lancet_cols)
+# plot_score_histogram_with_cutoff(survival, "Score_RIPSS_augmented", OUTPUT_DIR, lancet_cols, xlab = "RIPSS-augmented score", xticks = c(0, 1, 1.5, 2, 3, 3.5))
 
 
 # -- Figure. time-dependent AUC 그리기 -- #
@@ -627,9 +554,8 @@ sum(boot_dat[[3]][ok] < 0.5) / n
 sum(boot_dat[[3]][ok] < boot_dat[[1]][ok]) / n
 sum(boot_dat[[3]][ok] < boot_dat[[2]][ok]) / n
 
-
 tbl <- lapply(1:3, function(i) {
-  ci <- boot.ci(boot_res, type = "perc", index = i)$percent[4:5]
+  ci <- boot.ci(boot_res, type = "basic", index = i)$basic[4:5]
   tibble(
     Score = names(model_sets)[i],
     iAUC  = boot_res$t0[i],   # 원본 데이터에서의 iAUC = 점추정치
@@ -638,11 +564,13 @@ tbl <- lapply(1:3, function(i) {
   )
 }) %>% bind_rows() 
 
+# tbl |> gt()
+
 OUTPUT_DIR <- "/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Figure"
 
 plot_timeAUC_overlay(model_sets, AUC_TIMES = 2:10,
-                     OUTPUT_DIR = OUTPUT_DIR, file_name = "timeAUC_overlay.png", data = survival, ci_tbl = tbl)
-
+                     OUTPUT_DIR = OUTPUT_DIR, file_name = "timeAUC_overlay.png", data = survival,
+                     ci_tbl = tbl)   # Score당 1행만 전달(백분위)
 
 # -- time-dependent AUC 그리기 (BR vs Other) -- #
 BR_group <- survival %>% filter(SUBG_BR_OTHER == 1)
@@ -655,23 +583,24 @@ set.seed(1234)
 boot_BR <- boot(BR_cc, statistic = iauc_boot, R = 1000)
 set.seed(1234)
 boot_Other <- boot(Other_cc, statistic = iauc_boot, R = 1000)
+
 boot_dat <- as.data.frame(boot_BR$t)
 ok <- complete.cases(boot_dat[, c(1,2,3)])
 n  <- sum(ok)
 sum(boot_dat[[3]][ok] < 0.5) / n # 0.001
-sum(boot_dat[[3]][ok] < boot_dat[[1]][ok]) / n # 0.029
-sum(boot_dat[[3]][ok] < boot_dat[[2]][ok]) / n # 0.184
+sum(boot_dat[[3]][ok] < boot_dat[[1]][ok]) / n # 0.028
+sum(boot_dat[[3]][ok] < boot_dat[[2]][ok]) / n # 0.176
 
 
 boot_dat <- as.data.frame(boot_Other$t)
 ok <- complete.cases(boot_dat[, c(1,2,3)])
 n  <- sum(ok)
-sum(boot_dat[[3]][ok] < 0.5) / n # 0.069
-sum(boot_dat[[3]][ok] < boot_dat[[1]][ok]) / n # 0.224
-sum(boot_dat[[3]][ok] < boot_dat[[2]][ok]) / n # 0.112
+sum(boot_dat[[3]][ok] < 0.5) / n # 0.056
+sum(boot_dat[[3]][ok] < boot_dat[[1]][ok]) / n # 0.198
+sum(boot_dat[[3]][ok] < boot_dat[[2]][ok]) / n # 0.088
 
 tbl_BR <- lapply(1:3, function(i) {
-  ci <- boot.ci(boot_BR, type = "perc", index = i)$percent[4:5]
+  ci <- boot.ci(boot_BR, type = "basic", index = i)$basic[4:5]
   tibble(
     Score = names(model_sets)[i],
     iAUC  = boot_BR$t0[i],   # 원본 데이터에서의 iAUC = 점추정치
@@ -680,8 +609,9 @@ tbl_BR <- lapply(1:3, function(i) {
   )
 }) %>% bind_rows() 
 
+
 tbl_Other <- lapply(1:3, function(i) {
-  ci <- boot.ci(boot_Other, type = "perc", index = i)$percent[4:5]
+  ci <- boot.ci(boot_Other, type = "basic", index = i)$basic[4:5]
   tibble(
     Score = names(model_sets)[i],
     iAUC  = boot_Other$t0[i],   # 원본 데이터에서의 iAUC = 점추정치
@@ -689,6 +619,8 @@ tbl_Other <- lapply(1:3, function(i) {
     upper = ci[2]
   )
 }) %>% bind_rows() 
+# tbl_Other |> gt()
+
 
 plot_timeAUC_overlay(model_sets, AUC_TIMES = 2:10,
                      OUTPUT_DIR = OUTPUT_DIR, file_name = "timeAUC_overlay_BR.png", data = BR_group, ci_tbl = tbl_BR)
@@ -715,25 +647,26 @@ logrank_p %>% as.data.frame() %>% gt
 
 OUTPUT_DIR <- '/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Figure'
 
-plot_survival_by_group(fit1, survival, OUTPUT_DIR, file_name = "/survival_by_group_IPSS.png", group_col = "group_IPSS")
-plot_survival_by_group(fit2, survival, OUTPUT_DIR, file_name = "/survival_by_group_RIPSS.png", group_col = "group_RIPSS")
-plot_survival_by_group(fit3, survival, OUTPUT_DIR, file_name = "/survival_by_group_RIPSS_augmented.png", group_col = "group_RIPSS_augmented")
-plot_survival_by_group(fit4, survival, OUTPUT_DIR, file_name = "/survival_by_group_RIPSS_seg.png", group_col = "group_RIPSS_seg", palette = pal_lancet()(5)[c(1, 3, 2, 4, 5)])
+# opt_plot(fit1, OUTPUT_DIR, "/survival_by_group_IPSS.png", conf = F, pval = F)
+# opt_plot(fit2, OUTPUT_DIR, "/survival_by_group_RIPSS.png", conf = F, pval = F)
+# opt_plot(fit3, OUTPUT_DIR, "/survival_by_group_RIPSS_augmented.png", conf = F, pval = F)
+# opt_plot(fit4, OUTPUT_DIR, "/survival_by_group_RIPSS_seg.png", conf = F, pval = F, deadline = 10, palette = pal_lancet()(5)[c(1, 3, 4, 5, 2)])
 
 # Survival results
-km_summary_by_group(survival, "group_IPSS", "death_yr", "death")
-cox_hr_by_group(survival, "group_IPSS", "death_yr", "death")
-km_summary_by_group(survival, "group_RIPSS", "death_yr", "death")
-cox_hr_by_group(survival, "group_RIPSS", "death_yr", "death")
-km_summary_by_group(survival, "group_RIPSS_augmented", "death_yr", "death")
-cox_hr_by_group(survival, "group_RIPSS_augmented", "death_yr", "death")
-km_summary_by_group(survival, "group_RIPSS_seg", "death_yr", "death")
-cox_hr_by_group(survival, "group_RIPSS_seg", "death_yr", "death")
+# km_summary_by_group(survival, "group_IPSS", "death_yr", "death")
+# cox_hr_by_group(survival, "group_IPSS", "death_yr", "death")
+# km_summary_by_group(survival, "group_RIPSS", "death_yr", "death")
+# cox_hr_by_group(survival, "group_RIPSS", "death_yr", "death")
+# km_summary_by_group(survival, "group_RIPSS_augmented", "death_yr", "death")
+# cox_hr_by_group(survival, "group_RIPSS_augmented", "death_yr", "death")
+# km_summary_by_group(survival, "group_RIPSS_seg", "death_yr", "death")
+# cox_hr_by_group(survival, "group_RIPSS_seg", "death_yr", "death")
 
-vars <- c("IPSS"            = "group_IPSS",
-          "RIPSS"           = "group_RIPSS",
-          "RIPSS-augmented" = "group_RIPSS_augmented",
-          "RIPSS seg" = "group_RIPSS_seg")
+
+vars <- c(IPSS            = "group_IPSS",
+          RIPSS           = "group_RIPSS",
+          RIPSS_augmented = "group_RIPSS_augmented",
+          RIPSS_seg       = "group_RIPSS_seg")
 
 tbl <- do.call(rbind, lapply(names(vars), function(sys) {
   t <- table(survival[[ vars[sys] ]])
@@ -743,16 +676,23 @@ tbl <- do.call(rbind, lapply(names(vars), function(sys) {
              row.names = NULL)
 }))
 
-tbl |>
-  gt(groupname_col = "System") |>
-  cols_label(Group = "Risk group", N = "N") |>
-  summary_rows(
-    groups = everything(),
-    columns = N,
-    fns = list(Total = ~sum(.)),
-    fmt = ~fmt_number(., decimals = 0)
-  )
+# tbl |>
+#   gt(groupname_col = "System") |>
+#   cols_label(Group = "Risk group", N = "N") |>
+#   summary_rows(
+#     groups = everything(),
+#     columns = N,
+#     fns = list(Total = ~sum(.)),
+#     fmt = ~fmt_number(., decimals = 0)
+#   )
 
+BR_group$group_IPSS %>% table(useNA = "always")
+BR_group$group_RIPSS %>% table(useNA = "always")
+BR_group$group_RIPSS_augmented %>% table(useNA = "always")
+
+Other_group$group_IPSS %>% table(useNA = "always")
+Other_group$group_RIPSS %>% table(useNA = "always")
+Other_group$group_RIPSS_augmented %>% table(useNA = "always")
 
 
 # -- survival curve 그리기 by score group in BR group -- #
@@ -771,17 +711,17 @@ logrank_p <- sapply(sd_list, function(s) {
 })
 logrank_p %>% as.data.frame() %>% gt
 
-plot_survival_by_group(fit1, BR_group, OUTPUT_DIR, file_name = "/survival_by_group_IPSS_BR.png", group_col = "group_IPSS")
-plot_survival_by_group(fit2, BR_group, OUTPUT_DIR, file_name = "/survival_by_group_RIPSS_BR.png", group_col = "group_RIPSS")
-plot_survival_by_group(fit3, BR_group, OUTPUT_DIR, file_name = "/survival_by_group_RIPSS_augmented_BR.png", group_col = "group_RIPSS_augmented")
+# opt_plot(fit1, OUTPUT_DIR, file_name = "/survival_by_group_IPSS_BR.png", conf = F, pval = F, deadline = 10)
+# opt_plot(fit2, OUTPUT_DIR, file_name = "/survival_by_group_RIPSS_BR.png", conf = F, pval = F, deadline = 10)
+# opt_plot(fit3, OUTPUT_DIR, file_name = "/survival_by_group_RIPSS_augmented_BR.png", conf = F, pval = F, deadline = 10)
 
 
-km_summary_by_group(BR_group, "group_IPSS", "death_yr", "death")
-cox_hr_by_group(BR_group, "group_IPSS", "death_yr", "death")
-km_summary_by_group(BR_group, "group_RIPSS", "death_yr", "death")
-cox_hr_by_group(BR_group, "group_RIPSS", "death_yr", "death")
-km_summary_by_group(BR_group, "group_RIPSS_augmented", "death_yr", "death")
-cox_hr_by_group(BR_group, "group_RIPSS_augmented", "death_yr", "death")
+# km_summary_by_group(BR_group, "group_IPSS", "death_yr", "death")
+# cox_hr_by_group(BR_group, "group_IPSS", "death_yr", "death")
+# km_summary_by_group(BR_group, "group_RIPSS", "death_yr", "death")
+# cox_hr_by_group(BR_group, "group_RIPSS", "death_yr", "death")
+# km_summary_by_group(BR_group, "group_RIPSS_augmented", "death_yr", "death")
+# cox_hr_by_group(BR_group, "group_RIPSS_augmented", "death_yr", "death")
 
 
 
@@ -794,9 +734,9 @@ tbl <- do.call(rbind, lapply(names(vars), function(sys) {
              row.names = NULL)
 }))
 
-tbl |>
-  gt(groupname_col = "System") |>
-  cols_label(Group = "Risk group", N = "N")
+# tbl |>
+#   gt(groupname_col = "System") |>
+#   cols_label(Group = "Risk group", N = "N")
 
 
 # -- survival curve 그리기 by score group in Other group -- #
@@ -815,16 +755,16 @@ logrank_p <- sapply(sd_list, function(s) {
 })
 logrank_p %>% as.data.frame() %>% gt
 
-plot_survival_by_group(fit1, Other_group, OUTPUT_DIR, file_name = "/survival_by_group_IPSS_Other.png", group_col = "group_IPSS")
-plot_survival_by_group(fit2, Other_group, OUTPUT_DIR, file_name = "/survival_by_group_RIPSS_Other.png", group_col = "group_RIPSS")
-plot_survival_by_group(fit3, Other_group, OUTPUT_DIR, file_name = "/survival_by_group_RIPSS_augmented_Other.png", group_col = "group_RIPSS_augmented")
+# opt_plot(fit1, OUTPUT_DIR, file_name = "/survival_by_group_IPSS_Other.png", conf = F, pval = F, deadline = 10)
+# opt_plot(fit2, OUTPUT_DIR, file_name = "/survival_by_group_RIPSS_Other.png", conf = F, pval = F, deadline = 10)
+# opt_plot(fit3, OUTPUT_DIR, file_name = "/survival_by_group_RIPSS_augmented_Other.png", conf = F, pval = F, deadline = 10)
 
-km_summary_by_group(Other_group, "group_IPSS", "death_yr", "death")
-cox_hr_by_group(Other_group, "group_IPSS", "death_yr", "death")
-km_summary_by_group(Other_group, "group_RIPSS", "death_yr", "death")
-cox_hr_by_group(Other_group, "group_RIPSS", "death_yr", "death")
-km_summary_by_group(Other_group, "group_RIPSS_augmented", "death_yr", "death")
-cox_hr_by_group(Other_group, "group_RIPSS_augmented", "death_yr", "death")
+# km_summary_by_group(Other_group, "group_IPSS", "death_yr", "death")
+# cox_hr_by_group(Other_group, "group_IPSS", "death_yr", "death")
+# km_summary_by_group(Other_group, "group_RIPSS", "death_yr", "death")
+# cox_hr_by_group(Other_group, "group_RIPSS", "death_yr", "death")
+# km_summary_by_group(Other_group, "group_RIPSS_augmented", "death_yr", "death")
+# cox_hr_by_group(Other_group, "group_RIPSS_augmented", "death_yr", "death")
 
 
 tbl <- do.call(rbind, lapply(names(vars), function(sys) {
@@ -835,29 +775,31 @@ tbl <- do.call(rbind, lapply(names(vars), function(sys) {
              row.names = NULL)
 }))
 
-tbl |>
-  gt(groupname_col = "System") |>
-  cols_label(Group = "Risk group", N = "N")
+# tbl |>
+#   gt(groupname_col = "System") |>
+#   cols_label(Group = "Risk group", N = "N")
 
 
 
 # -- survival curve 그리기 by BR/Other group -- #
 OUTPUT_DIR <- '/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Figure'
+survival$SUBG_BR_OTHER <- factor(survival$SUBG_BR_OTHER, labels = c("BR", "Other"), levels = c(1, 2))
 fit <- survfit(Surv(death_yr, death) ~ SUBG_BR_OTHER, data = survival)
-plot_survival_by_group(fit, survival, OUTPUT_DIR, file_name = "/survival_by_group_BR_OTHER.png", group_col = "SUBG_BR_OTHER", palette = pal_lancet()(3)[c(1,2)])
+opt_plot(fit, OUTPUT_DIR, file_name = "/survival_by_group_BR_OTHER.png", conf = F, pval = F, deadline = 10)
 
 sd <- survdiff(Surv(death_yr, death) ~ SUBG_BR_OTHER, data = survival)
 print(ifelse(sd$pvalue < .001, "<.001", sprintf("%.3f", sd$pvalue)))
 
 # Survival results
-km_summary_by_group(survival, "SUBG_BR_OTHER", "death_yr", "death")
-cox_hr_by_group(survival, "SUBG_BR_OTHER", "death_yr", "death")
+# km_summary_by_group(survival, "SUBG_BR_OTHER", "death_yr", "death")
+# cox_hr_by_group(survival, "SUBG_BR_OTHER", "death_yr", "death")
 
 
 
 # -- time-dependent ROC (2,4,6,8 years) -- #
 OUTPUT_DIR <- '/Users/chaehyun/Library/CloudStorage/Dropbox/연구_PIPET/PIPET_Hematology/MM/Lpl/Figure'
 plot_timeROC_overlay(data = survival, model_sets, AUC_TIMES = c(2,4,6,8,10), PLOT_TIMES = c(2,4,6,8,10), OUTPUT_DIR = OUTPUT_DIR)
+
 
 
 # 공통 complete-case 데이터
@@ -882,15 +824,13 @@ auc_boot <- function(data, indices, times = AUC_TIMES) {
 set.seed(1234)
 boot_auc <- boot(dat_cc, statistic = auc_boot, R = 1000)
 boot_dat <- as.data.frame(boot_auc$t)
-head(boot_dat)
 
 nt <- length(AUC_TIMES)
 colnames(boot_dat) <- c(paste0("RIPSS_t", AUC_TIMES),
                         paste0("AUG_t",   AUC_TIMES))
-
+head(boot_dat)
 # 시점별 단측검정
 #   H0: AUC_aug <= AUC_ripss   vs   H1: AUC_aug > AUC_ripss
-#   p = (augmented < RIPSS 인 복제 비율)
 res <- lapply(seq_len(nt), function(j) {
   ripss <- boot_dat[[j]]          # RIPSS AUC  (j번째 시점)
   aug   <- boot_dat[[j + nt]]     # augmented AUC

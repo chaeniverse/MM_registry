@@ -40,6 +40,7 @@ library(dplyr)
 library(survAUC)
 library(timeROC)
 library(boot)
+library(patchwork)
 
 select <- dplyr::select
 
@@ -178,65 +179,113 @@ plot_timeROC_overlay <- function(data, model_sets, AUC_TIMES, PLOT_TIMES, OUTPUT
   }
 
   colors <- pal_lancet()(length(results))
+  names(colors) <- names(results)
+
+  font_size <- 16
 
   for (tp in PLOT_TIMES) {
-    png(file.path(OUTPUT_DIR, sprintf("ROC_overlay_%dyr.png", tp)),
-        height = 8, width = 8, units = "in", res = 300)
-    par(pty = "s", mar = c(5, 5, 4, 2))
+    # 모델별 ROC 좌표(FP, TP) (plot_timeAUC_overlay 스타일 ggplot)
+    df <- do.call(rbind, lapply(names(results), function(nm) {
+      tr  <- results[[nm]]$timeROC
+      idx <- which(tr$times == tp)
+      data.frame(model = nm,
+                 FP = as.numeric(tr$FP[, idx]),
+                 TP = as.numeric(tr$TP[, idx]))
+    }))
+    df$model <- factor(df$model, levels = names(results))
 
-    for (i in seq_along(results)) {
-      plot(results[[i]]$timeROC, time = tp,
-           col = colors[i], lwd = 3,
-           add = (i != 1), title = FALSE)
-    }
-    title(main = sprintf("Time-dependent ROC (%d-year OS)", tp),
-          cex.main = 1.3)
-
+    # 범례 = 모델명 + AUC (95% CI)
     legend_labels <- sapply(seq_along(results), function(i) {
       tr  <- results[[i]]$timeROC
       idx <- which(tr$times == tp)
       a   <- tr$AUC[idx]
       se  <- tr$inference$vect_sd_1[idx]
-      sprintf("%s = %.3f (%.3f–%.3f)",
+      sprintf("%s = %.3f (%.3f-%.3f)",
               names(results)[i], a, a - 1.96*se, a + 1.96*se)
     })
-    legend("bottomright", legend = legend_labels,
-           col = colors, lwd = 3, cex = 0.9, bty = "n")
-    dev.off()
 
+    p <- ggplot(df, aes(x = FP, y = TP, color = model)) +
+      geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey60") +
+      geom_line(linewidth = 1) +
+      scale_color_manual(values = colors, labels = legend_labels) +
+      scale_x_continuous(limits = c(0, 1)) +   # expand 생략 = 기본 5% 여백
+      scale_y_continuous(limits = c(0, 1)) +
+      labs(x = "1-Specificity", y = "Sensitivity", color = NULL) +   # ylab(Sensitivity) 유지
+      theme_classic(base_size = font_size) +
+      theme(axis.title           = element_text(size = font_size),
+            axis.text            = element_text(size = font_size),
+            legend.text          = element_text(size = font_size - 2),
+            legend.position      = c(0.98, 0.02),
+            legend.justification = c(1, 0),
+            aspect.ratio         = 1)
+
+    ggsave(file.path(OUTPUT_DIR, sprintf("ROC_overlay_%dyr.png", tp)), p,
+           width = 10, height = 10, units = "in", dpi = 300)   # timeAUC와 동일 비율
     cat(sprintf("  [%d-year] ROC plotted\n", tp))
   }
 }
 
-plot_survival_by_group <- function(fit, survival, OUTPUT_DIR, file_name, group_col, palette = pal_lancet()(3)[c(1, 3, 2)]) {
+# -- Cumulative incidence curve (opt_plot 스타일) -- #
+opt_cuminc <- function(data, OUTPUT_DIR, file_name,
+                       time_col = "time_yr", status_col = "status",
+                       outcome = "1",
+                       risk_times = 0:6, marker_times = c(3, 6),
+                       palette = pal_lancet()(2)[2], font_size = 16) {
 
-  png(paste0(OUTPUT_DIR, file_name), height = 10, width = 10, units = "in", res = 300)
-  font_size <- 16
-  p <- ggsurvplot(
-    fit, data           = survival,
-    surv.median.line    = "hv",
-    risk.table          = TRUE,
-    tables.col          = "strata",
-    tables.y.text       = FALSE,
-    conf.int            = FALSE,
-    xlim                = c(0, 12),
-    xlab                = "Time (years)",
-    ylab                = "Survival Probability (%)",
-    legend.title        = "",
-    legend.labs         = levels(survival[[group_col]]),
-    tables.height       = 0.25,
-    break.time.by       = 1,
-    risk.table.fontsize = 5,
-    palette             = palette,
-    tables.theme        = theme_cleantable()
+  suppressWarnings(suppressMessages({
+
+  default_gray <- theme_gray()$line$colour
+  xmax <- max(risk_times)
+
+  brk <- if (length(risk_times) > 1) risk_times[2] - risk_times[1] else 1
+  # 두 패널 x축 정렬용 공통 스케일
+  sx  <- scale_x_continuous(breaks = risk_times, limits = c(0, xmax),
+                            expand = expansion(mult = c(0.02, 0.02)), oob = scales::oob_keep)
+
+  # -- CIF curve (ggcuminc) --
+  fml <- as.formula(sprintf("Surv(%s, %s) ~ 1", time_col, status_col))
+  cif <- tidycmprsk::cuminc(fml, data = data) |>
+    ggcuminc(outcome = outcome, linewidth = 1) +
+    add_confidence_interval() +
+    scale_y_continuous(breaks = seq(0, 1, 0.25), labels = function(x) x * 100, limits = c(0, 1)) +
+    sx +
+    labs(x = "Time (Year)", y = "Cumulative Incidence (%)") +
+    theme_classic(base_size = font_size) +
+    theme(axis.title      = element_text(size = font_size),
+          axis.text       = element_text(size = font_size),
+          legend.position = "none")
+
+  # marker time 점선 (예: 3yr / 6yr)
+  for (mt in marker_times) {
+    cif <- cif + geom_vline(xintercept = mt, linetype = "dashed",
+                            color = default_gray, linewidth = 0.5)
+  }
+  cif$layers[[1]]$aes_params$colour <- palette[1]
+  cif$layers[[2]]$aes_params$fill   <- palette[1]
+
+  # -- Number at risk table : survival curve(ggsurvplot)의 $table 을 그대로 사용 --
+  ev   <- as.integer(as.character(data[[status_col]]) != levels(factor(data[[status_col]]))[1])
+  df   <- data.frame(.t = data[[time_col]], .e = ev)
+  sfit <- survfit(Surv(.t, .e) ~ 1, data = df)
+
+  g <- ggsurvplot(
+    sfit, data       = df,
+    risk.table       = TRUE,
+    fontsize         = 4,
+    tables.theme     = theme(axis.text.y = element_text(size = 12)),
+    xlim             = c(0, xmax),
+    break.time.by    = brk,
+    palette          = palette[1]
   )
-  p$plot <- p$plot +
-    scale_y_continuous(labels = function(x) x * 100) +
-    theme(axis.title  = element_text(size = font_size),
-          axis.text   = element_text(size = font_size),
-          legend.text = element_text(size = font_size - 2))
-  print(p)
-  dev.off()
+  risktab <- g$table + sx +
+    theme(legend.position = "none", plot.margin = margin(0, 0, 0, 0))
+
+  # -- curve + risk table 결합 (opt_plot 스타일, heights 5:1) --
+  image <- cif / risktab + plot_layout(heights = c(5, 1))
+
+  ggsave(paste0(OUTPUT_DIR, file_name), image, width = 10, height = 10, units = "in", dpi = 300)
+  print(image)
+  }))
 }
 
 # -- Survival probability at 5yr / 10yr --
@@ -323,7 +372,7 @@ format_median <- function(fit){
 }
 
 
-plot_score_histogram_with_cutoff <- function(survival, score_var, OUTPUT_DIR, lancet_cols) {
+plot_score_histogram_with_cutoff <- function(survival, score_var, OUTPUT_DIR, lancet_cols, xlab = score_var, xticks = waiver()) {
 
   roc2 <- roc(survival[["death"]], survival[[score_var]])
   coords_best <- coords(roc2, "best", best.method = "youden", ret = c("threshold", "sensitivity", "specificity"))
@@ -341,10 +390,10 @@ plot_score_histogram_with_cutoff <- function(survival, score_var, OUTPUT_DIR, la
     geom_histogram(aes(y = after_stat(density)), binwidth = 0.5, center = 0, alpha = 0.2, position = "identity") +
     # geom_vline(data = mu, aes(xintercept = grp.mean, color = outcome), linetype = "dashed") +
     geom_vline(xintercept = coords_best$threshold, linetype = "dotted", color = "black", linewidth = 1) +
-    annotate("text", x = coords_best$threshold + 1, y = Inf, vjust = 2,
-            label = sprintf("Cutoff = %.1f", coords_best$threshold), size = 4) +
     scale_fill_manual(values = lancet_cols, labels = c("Alive", "Dead")) +
     scale_color_manual(values = lancet_cols, labels = c("Alive", "Dead")) +
+    labs(x = xlab, y = "Density") +
+    scale_x_continuous(breaks = xticks) +
     theme(
       panel.background = element_rect(fill = "white"),
       panel.border = element_rect(fill = NA, colour = "black"),
@@ -360,10 +409,13 @@ plot_score_histogram_with_cutoff <- function(survival, score_var, OUTPUT_DIR, la
 }
 
 plot_timeAUC_overlay <- function(model_sets, AUC_TIMES, OUTPUT_DIR,
-                                 xlab = "Time (years)",
+                                 xlab = "Time (Year)",
                                  file_name = "timeAUC_overlay.png",
                                  data = dat,
-                                 ci_tbl = NULL) {
+                                 ci_tbl = NULL,
+                                 font_size = 16) {
+
+  suppressWarnings(suppressMessages({
 
   all_vars <- unique(unlist(model_sets))
   dat_cc   <- data[, c("death", "death_yr", all_vars)] %>% na.omit()
@@ -395,21 +447,7 @@ plot_timeAUC_overlay <- function(model_sets, AUC_TIMES, OUTPUT_DIR,
   }
 
   colors <- pal_lancet()(length(results))
-
-  # ---- 단일 overlay 그림: AUC(t) vs time ----
-  png(file.path(OUTPUT_DIR, file_name), height = 8, width = 8, units = "in", res = 300)
-  par(pty = "s", mar = c(5, 5, 4, 2))
-
-  plot(NA, xlim = range(AUC_TIMES), ylim = c(0.1, 1),
-       xlab = xlab, ylab = "Time-dependent AUC",
-       cex.lab = 1.3, cex.axis = 1.1, las = 1)
-  abline(h = 0.5, lty = 2, col = "grey60")
-
-  for (i in seq_along(results)) {
-    tr <- results[[i]]$timeROC
-    lines(tr$times, tr$AUC, col = colors[i], lwd = 3, type = "o", pch = 16)
-  }
-  title(main = "Time-dependent AUC", cex.main = 1.3)
+  names(colors) <- names(results)
 
   # 범례 = 모델명 + iAUC(있으면) (+CI 있으면)
   legend_labels <- sapply(seq_along(results), function(i) {
@@ -422,10 +460,118 @@ plot_timeAUC_overlay <- function(model_sets, AUC_TIMES, OUTPUT_DIR,
     else
       sprintf("%s: %.3f (%.3f-%.3f)", nm, r$iauc, r$ci[1], r$ci[2])
   })
-  legend("bottomright", legend = legend_labels,
-         col = colors, lwd = 3, cex = 0.9, bty = "n")
-  dev.off()
 
+  # ---- 단일 overlay 그림: AUC(t) vs time (opt_plot 스타일 ggplot) ----
+  df <- do.call(rbind, lapply(names(results), function(nm) {
+    tr <- results[[nm]]$timeROC
+    data.frame(model = nm, time = tr$times, AUC = as.numeric(tr$AUC))
+  }))
+  df$model <- factor(df$model, levels = names(results))
+
+  p <- ggplot(df, aes(x = time, y = AUC, color = model)) +
+    geom_hline(yintercept = 0.5, linetype = "dashed", color = "grey60") +
+    geom_line(linewidth = 1) +
+    geom_point(size = 2.5) +
+    scale_color_manual(values = colors, labels = legend_labels) +
+    scale_x_continuous(breaks = AUC_TIMES,
+                       expand = expansion(mult = c(0.02, 0.02))) +
+    scale_y_continuous(limits = c(0.1, 1)) +
+    labs(x = xlab, y = "AUC (t)", color = NULL) +
+    theme_classic(base_size = font_size) +
+    theme(axis.title           = element_text(size = font_size),
+          axis.text            = element_text(size = font_size),
+          legend.text          = element_text(size = font_size - 2),
+          legend.position      = c(0.98, 0.02),
+          legend.justification = c(1, 0),
+          aspect.ratio         = 1)
+
+  ggsave(file.path(OUTPUT_DIR, file_name), p,
+         width = 10, height = 10, units = "in", dpi = 300)   # opt_plot/opt_cuminc과 동일 비율
   cat(sprintf("Plot saved: %s\n", file.path(OUTPUT_DIR, file_name)))
+  print(p)
   invisible(results)
+  }))
+}
+
+
+opt_plot = function(a, OUTPUT_DIR, file_name, deadline = 8, conf = TRUE, ptitle = "up", col="", palette = NULL, pval = TRUE) {
+# Option ------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  suppressWarnings(suppressMessages({
+  color <- if (col == "rev") {color <- list(pal_lancet()(2)[2], rev(pal_lancet()(2)), rev(pal_lancet()(3)[c(3, 1, 2)])) # 컬러 조합 방법
+  } else {color <- list(pal_lancet()(2)[2], pal_lancet()(2),pal_lancet()(3)[c(1, 3, 2)])}
+  
+  group <- length(a$n)                                                            # group 개수
+
+  if (is.null(palette)) palette <- color[[group]]                                 # palette 미지정 시 기본 lancet(그룹 1~3); 지정 시 그대로(예: 5그룹)
+
+  l <- c("none")                                                                  # legend 사용 여부
+
+  deadline <- c(-0.1, deadline)                                                   # x축 범위 (연 단위)
+
+#  itv <- ifelse(deadline[2] >= 10, 2, 1)                                          # 눈금(조건에 따라, 1년 또는 2년)
+  itv <- 1
+  
+  pv <- FALSE                                                                     # p-value 출력 여부(뒤에 조건에 따라 변경)
+  
+  if (sum(ptitle %in% "up")>0) {ptitle = c(deadline[2]*0.75,0.90)                 #!! p-value 위치
+  } else if (sum(ptitle %in% "down")>0) {ptitle = c(0,0.25)
+  } else {ptitle = c(deadline[2]*ptitle[1],ptitle[2])}
+
+# Survival Plot ------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+  if (group > 1){
+    names(a$strata) <- substr(names(a$strata), str_locate(names(a$strata), "=")[1,1] + 1, 100)      # 라벨링
+    
+    ytitle <- -max(nchar(names(a$strata)))                                                          # 텍스트 위치 이동(Survival probability (%))
+    
+    l <- "top"                                                                                      # legend 위치
+
+    pv <- pval                                                                                      # p-value 출력(그룹 2개 이상 & pval=TRUE일 때만)
+  }
+  
+  p =
+    a %>% ggsurvplot(legend.title = "",                                                             
+                     legend = l,
+                     xlab = "Time (Year)",
+                     xlim = deadline,
+                     break.x.by = itv,
+                     ylab = "Survival probability (%)",
+                     conf.int = conf,
+                     conf.int.fill = "strata",                                                      # 신뢰구간 그룹 색상 지정
+                     risk.table = T,
+                     # risk.table.title="이름 변경",
+                     fontsize = 4,                                                                  #!! Risk table 자료 폰트 사이즈
+                     tables.theme = theme(axis.text.y = element_text(size=12)),                     #!! Risk table 그룹명 폰트 사이즈
+                     palette = palette,
+                     surv.median.line = "hv",
+                     pval = pv,
+                     pval.coord = ptitle,
+                     pval.size = 5                                                                  #!! P-value 폰트 사이즈
+                    ) %>% suppressMessages() %>% suppressWarnings()                                 # 경고메시지 미출력
+
+# Plot Option -----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  p$plot =                                                                                                                                
+    p$plot +
+    scale_y_continuous(breaks = seq(0, 1, 0.25), labels = seq(0, 1, 0.25)*100)                                                            # y 축 라벨링 변경
+  
+  if (group !=1){                                                                                                                         
+    p$plot =
+      p$plot + theme(axis.title.y = element_text(vjust = ytitle))                                                                         # x 축 라벨링 위치 조정
+
+    if (pv) {                                                                                                                              # p-value 표시할 때만 라벨 포맷 변경
+      p_val_geomloc = which(sapply(p$plot$layers, function(x) any(class(x$geom) == "GeomText")))                                          # p-value 출력 값 변경
+
+      if (surv_pvalue(a)[[2]] < 0.001) {p$plot$layers[[p_val_geomloc[1]]]$aes_params$label = "p < 0.001"
+        } else {p$plot$layers[[p_val_geomloc[1]]]$aes_params$label = paste0("p = ", sprintf("%.3f", surv_pvalue(a)[2]))}
+    }
+
+    p$table = p$table + theme(legend.position = "none", plot.margin = margin(0, 0, 0, 0))
+  }
+
+  image = p$plot / p$table + plot_layout(heights = c(5, 1)) # 이미지 사이즈
+
+  ggsave(paste0(OUTPUT_DIR, file_name), image, width = 10, height = 10, units = "in", dpi = 300) # PNG 저장 (opt_cuminc과 동일 비율)
+
+  # return(image)
+  print(image)
+  }))
 }
