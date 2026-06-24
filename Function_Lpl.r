@@ -181,7 +181,7 @@ plot_timeROC_overlay <- function(data, model_sets, AUC_TIMES, PLOT_TIMES, OUTPUT
   colors <- pal_lancet()(length(results))
   names(colors) <- names(results)
 
-  font_size <- 16
+  font_size <- 24
 
   for (tp in PLOT_TIMES) {
     # 모델별 ROC 좌표(FP, TP) (plot_timeAUC_overlay 스타일 ggplot)
@@ -217,6 +217,8 @@ plot_timeROC_overlay <- function(data, model_sets, AUC_TIMES, PLOT_TIMES, OUTPUT
             legend.text          = element_text(size = font_size - 2),
             legend.position      = c(0.98, 0.02),
             legend.justification = c(1, 0),
+            legend.background    = element_blank(),   # 범례 흰색 박스 제거 (투명)
+            legend.key           = element_blank(),   # 범례 키 흰색 박스 제거 (투명)
             aspect.ratio         = 1)
 
     ggsave(file.path(OUTPUT_DIR, sprintf("ROC_overlay_%dyr.png", tp)), p,
@@ -230,7 +232,7 @@ opt_cuminc <- function(data, OUTPUT_DIR, file_name,
                        time_col = "time_yr", status_col = "status",
                        outcome = "1",
                        risk_times = 0:6, marker_times = c(3, 6),
-                       palette = pal_lancet()(2)[2], font_size = 16) {
+                       palette = pal_lancet()(2)[2], font_size = 24) {
 
   suppressWarnings(suppressMessages({
 
@@ -240,7 +242,7 @@ opt_cuminc <- function(data, OUTPUT_DIR, file_name,
   brk <- if (length(risk_times) > 1) risk_times[2] - risk_times[1] else 1
   # 두 패널 x축 정렬용 공통 스케일
   sx  <- scale_x_continuous(breaks = risk_times, limits = c(0, xmax),
-                            expand = expansion(mult = c(0.02, 0.02)), oob = scales::oob_keep)
+                            expand = expansion(mult = c(0.06, 0.02)), oob = scales::oob_keep)  # 왼쪽 여백 ↑ (첫 숫자 안 잘리게)
 
   # -- CIF curve (ggcuminc) --
   fml <- as.formula(sprintf("Surv(%s, %s) ~ 1", time_col, status_col))
@@ -271,8 +273,13 @@ opt_cuminc <- function(data, OUTPUT_DIR, file_name,
   g <- ggsurvplot(
     sfit, data       = df,
     risk.table       = TRUE,
-    fontsize         = 4,
-    tables.theme     = theme(axis.text.y = element_text(size = 12)),
+    risk.table.fontsize         = 9,
+    xlab             = "Time (Year)",                                #!! 위험표 x축 라벨
+    tables.theme     = theme(axis.text.y  = element_text(size = 24),
+                             axis.text.x  = element_text(size = 24),
+                             axis.title.x = element_text(size = 24),
+                             axis.title.y = element_blank(),          #!! "Strata" 제목 제거 ("All"은 유지)
+                             plot.title   = element_text(size = 24)),  # "Number at risk" 제목
     xlim             = c(0, xmax),
     break.time.by    = brk,
     palette          = palette[1]
@@ -289,14 +296,24 @@ opt_cuminc <- function(data, OUTPUT_DIR, file_name,
 }
 
 # -- Survival probability at 5yr / 10yr --
+# extend = TRUE 로 표 구조(모든 그룹 × 모든 시점)는 유지하되,
+# 요청 시점(tp)이 그 그룹의 최대 추적시간을 넘으면(외삽) 그 칸만 "NR"로 마스킹
 fmt_surv <- function(fit, tp) {
-  s <- summary(fit, times = tp, extend = TRUE)
-  data.frame(
-    strata = as.character(s$strata),
-    value  = sprintf("%.1f%% (%.1f–%.1f)",
-                    s$surv * 100, s$lower * 100, s$upper * 100),
-    stringsAsFactors = FALSE
-  )
+  s          <- summary(fit, times = tp, extend = TRUE)
+  strata_chr <- as.character(s$strata)
+
+  # 그룹별 최대 추적시간(마지막 관찰시점)
+  if (is.null(fit$strata)) {                         # 단일 그룹
+    max_fu <- setNames(max(fit$time), strata_chr[1])
+  } else {                                           # 다중 그룹
+    grp    <- rep(names(fit$strata), fit$strata)
+    max_fu <- tapply(fit$time, grp, max)
+  }
+
+  value <- sprintf("%.1f%% (%.1f–%.1f)", s$surv * 100, s$lower * 100, s$upper * 100)
+  value[tp > max_fu[strata_chr]] <- "NR"             # 추적 못 미친 시점 = 외삽 → NR (원하면 "NE"/"—"/NA로 변경)
+
+  data.frame(strata = strata_chr, value = value, stringsAsFactors = FALSE)
 }
 
 km_summary_by_group <- function(data, group_col, time_col, event_col) {
@@ -413,7 +430,7 @@ plot_timeAUC_overlay <- function(model_sets, AUC_TIMES, OUTPUT_DIR,
                                  file_name = "timeAUC_overlay.png",
                                  data = dat,
                                  ci_tbl = NULL,
-                                 font_size = 16) {
+                                 font_size = 24) {
 
   suppressWarnings(suppressMessages({
 
@@ -480,7 +497,7 @@ plot_timeAUC_overlay <- function(model_sets, AUC_TIMES, OUTPUT_DIR,
     theme_classic(base_size = font_size) +
     theme(axis.title           = element_text(size = font_size),
           axis.text            = element_text(size = font_size),
-          legend.text          = element_text(size = font_size - 2),
+          legend.text          = element_text(size = font_size),
           legend.position      = c(0.98, 0.02),
           legend.justification = c(1, 0),
           aspect.ratio         = 1)
@@ -494,7 +511,8 @@ plot_timeAUC_overlay <- function(model_sets, AUC_TIMES, OUTPUT_DIR,
 }
 
 
-opt_plot = function(a, OUTPUT_DIR, file_name, deadline = 8, conf = TRUE, ptitle = "up", col="", palette = NULL, pval = TRUE) {
+opt_plot = function(a, OUTPUT_DIR, file_name, deadline = 8, conf = TRUE, ptitle = "up", col="", palette = NULL, pval = TRUE,
+                    risk_fontsize = 9, table_height = 1) {
 # Option ------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   suppressWarnings(suppressMessages({
   color <- if (col == "rev") {color <- list(pal_lancet()(2)[2], rev(pal_lancet()(2)), rev(pal_lancet()(3)[c(3, 1, 2)])) # 컬러 조합 방법
@@ -520,11 +538,8 @@ opt_plot = function(a, OUTPUT_DIR, file_name, deadline = 8, conf = TRUE, ptitle 
 # Survival Plot ------------------------------------------------------------------------------------------------------------------------------------------------------------------  
   if (group > 1){
     names(a$strata) <- substr(names(a$strata), str_locate(names(a$strata), "=")[1,1] + 1, 100)      # 라벨링
-    
     ytitle <- -max(nchar(names(a$strata)))                                                          # 텍스트 위치 이동(Survival probability (%))
-    
     l <- "top"                                                                                      # legend 위치
-
     pv <- pval                                                                                      # p-value 출력(그룹 2개 이상 & pval=TRUE일 때만)
   }
   
@@ -538,14 +553,23 @@ opt_plot = function(a, OUTPUT_DIR, file_name, deadline = 8, conf = TRUE, ptitle 
                      conf.int = conf,
                      conf.int.fill = "strata",                                                      # 신뢰구간 그룹 색상 지정
                      risk.table = T,
-                     # risk.table.title="이름 변경",
-                     fontsize = 4,                                                                  #!! Risk table 자료 폰트 사이즈
-                     tables.theme = theme(axis.text.y = element_text(size=12)),                     #!! Risk table 그룹명 폰트 사이즈
+                     risk.table.fontsize = risk_fontsize,
+                     tables.theme = theme(
+                       axis.text.y  = element_text(size = 24),   # 그룹명 (Low/Intermediate/High)
+                       axis.text.x  = element_text(size = 24),   # 0~8 숫자
+                       axis.title.x = element_text(size = 24),
+                       axis.title.y = element_text(size = 24),
+                       plot.title   = element_text(size = 24)
+                     ),
                      palette = palette,
                      surv.median.line = "hv",
                      pval = pv,
                      pval.coord = ptitle,
-                     pval.size = 5                                                                  #!! P-value 폰트 사이즈
+                     pval.size = 5,
+                     font.x = 24,
+                     font.y = 24,
+                     font.legend = 24,
+                     font.tickslab = 24
                     ) %>% suppressMessages() %>% suppressWarnings()                                 # 경고메시지 미출력
 
 # Plot Option -----------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -564,10 +588,15 @@ opt_plot = function(a, OUTPUT_DIR, file_name, deadline = 8, conf = TRUE, ptitle 
         } else {p$plot$layers[[p_val_geomloc[1]]]$aes_params$label = paste0("p = ", sprintf("%.3f", surv_pvalue(a)[2]))}
     }
 
-    p$table = p$table + theme(legend.position = "none", plot.margin = margin(0, 0, 0, 0))
+    p$table = 
+      p$table + 
+      theme(
+        legend.position = "none", 
+        plot.margin = margin(0, 0, 0, 0)
+      )
   }
 
-  image = p$plot / p$table + plot_layout(heights = c(5, 1)) # 이미지 사이즈
+  image = p$plot / p$table + plot_layout(heights = c(5, table_height)) # 이미지 사이즈 (table_height로 위험표 높이 조절)
 
   ggsave(paste0(OUTPUT_DIR, file_name), image, width = 10, height = 10, units = "in", dpi = 300) # PNG 저장 (opt_cuminc과 동일 비율)
 
